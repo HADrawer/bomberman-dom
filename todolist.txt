@@ -1,0 +1,111 @@
+# Bomberman-DOM Project – Checklist
+
+[ ] Framework Setup
+    [ ] Reuse mini-framework (DOM, State, Router, Events)
+    [ ] Ensure requestAnimationFrame loop works at 60fps
+    [ ] Add performance measurement tools (FPS counter, dev logs)
+
+[ ] Game Initialization
+    [ ] Create nickname input page
+    [ ] Implement waiting room (player counter: 2–4 players)
+    [ ] Add 20s wait → fallback 10s countdown
+    [ ] Start game when counter hits 4 or timer ends
+
+[ ] Map System
+    [ ] Fixed map visible for all players
+    [ ] Place permanent walls in fixed positions
+    [ ] Generate random destructible blocks
+    [ ] Ensure spawn zones are safe (bomb survival space)
+    [ ] Define starting positions in 4 corners
+
+[ ] Player System
+    [ ] Support 2–4 players
+    [ ] Each player starts with 3 lives
+    [ ] Movement handling with keyboard events
+    [ ] Collision with walls, blocks, bombs
+    [ ] Track player lives and elimination
+    [ ] Display winner when last player survives
+
+[ ] Bomb Mechanics
+    [ ] Place bomb at player position
+    [ ] Handle bomb explosion after timer
+    [ ] Explosion spreads in 4 directions (range depends on power-ups)
+    [ ] Destroy blocks hit by explosion
+    [ ] Damage players in explosion radius
+    [ ] Limit number of bombs per player
+
+[ ] Power-Ups
+    [ ] Random chance of power-up drop when block destroyed
+    [ ] Implement Bombs (extra bombs)
+    [ ] Implement Flames (extra explosion range)
+    [ ] Implement Speed (faster movement)
+
+[ ] Multiplayer Sync
+    [ ] Use WebSockets for player actions (move, bomb, power-up)
+    [ ] Sync game state across all clients
+    [ ] Handle latency and desync issues
+
+[ ] Chat System
+    [ ] Add WebSocket chat lobby
+    [ ] Enable in-game chat between players
+    [ ] Display messages in game UI
+
+[ ] UI / UX
+    [ ] Nickname input screen
+    [ ] Waiting room with player counter & timer
+    [ ] Game HUD (lives, power-ups, chat)
+    [ ] End screen showing winner
+
+[ ] Bonus Features (Optional)
+    [ ] AI players for Solo / Co-op
+    [ ] Extra power-ups (Bomb Push, Pass, Detonator, etc.)
+    [ ] Team mode (2v2)
+    [ ] Ghost mode after death
+    [ ] Release power-ups on death
+
+
+    
+# Bomberman-DOM Project – Work Split (5 Members)
+
+👤 Member 1 – Framework & Core Engine
+    [ ] Integrate the mini-framework (DOM, State, Events, Router)
+    [ ] Build main game loop with requestAnimationFrame (60fps, no frame drops)
+    [ ] Implement performance measurement (FPS counter, logs)
+    [ ] Set up event bus for communication between components
+    [ ] Ensure all modules (map, players, bombs) can hook into the loop
+
+👤 Member 2 – Map & Environment
+    [ ] Create fixed-size map layout (grid system)
+    [ ] Place permanent walls in fixed positions
+    [ ] Generate random destructible blocks (consistent across clients)
+    [ ] Ensure safe spawn zones in 4 corners
+    [ ] Handle block destruction from bomb explosions
+
+👤 Member 3 – Player & Controls
+    [ ] Implement 2–4 player support
+    [ ] Assign starting positions in corners
+    [ ] Player movement (keyboard input → DOM position updates)
+    [ ] Collision detection (walls, blocks, bombs)
+    [ ] Track 3 lives per player & elimination logic
+    [ ] Display winner when last player remains
+
+👤 Member 4 – Bombs & Power-Ups
+    [ ] Bomb placement (per player, limit based on power-up)
+    [ ] Bomb explosion logic (timer, blast in 4 directions)
+    [ ] Destroy destructible blocks
+    [ ] Damage players in explosion range
+    [ ] Power-ups system:
+        - Bombs (extra bomb capacity)
+        - Flames (increase explosion range)
+        - Speed (increase movement speed)
+    [ ] Handle random power-up drops from destroyed blocks
+
+👤 Member 5 – Multiplayer & Chat
+    [ ] Implement WebSocket server & client connection
+    [ ] Sync game state across all clients (player movement, bombs, power-ups)
+    [ ] Handle waiting room:
+        - Nickname input
+        - Player counter (2–4)
+        - 20s max wait → 10s countdown
+    [ ] In-game chat system (send/receive messages)
+    [ ] Keep game synchronized despite latency
