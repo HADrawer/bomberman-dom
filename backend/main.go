@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bomberman/handlers"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,6 +21,9 @@ func main() {
 
 	// WebSocket route
 	// mux.HandleFunc("/ws", wsHandler)
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		handlers.HandleWebSocket(w, r)
+	})
 
 	port := ":8080"
 	fmt.Println(" Server is running on http://localhost" + port)
