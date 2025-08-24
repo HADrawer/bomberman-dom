@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -10,13 +11,12 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-    ReadBufferSize:  1024,
-    WriteBufferSize: 1024,
-    CheckOrigin: func(r *http.Request) bool {
-        return true // Allow all connections
-    },
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all connections
+	},
 }
-
 
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -52,7 +52,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			Type string `json:"type"`
 		}
 		json.Unmarshal(message, &rawJson)
-		//fmt.Println(message)
+		fmt.Println(message)
 
 		switch rawJson.Type {
 		case "message", "get_users", "get_chat_history", "new_message", "logout", "get_group_chat_history", "group_message":

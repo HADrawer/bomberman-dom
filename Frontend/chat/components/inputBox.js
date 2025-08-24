@@ -1,5 +1,8 @@
 import { VNode } from "../../Framework/over-react.js";
 import { makeChatApp } from "./chatApp.js";
+import { socket, Socket } from "../../static/ws.js";
+import { text } from "stream/consumers";
+
 export function makeInputBox(app) {
   const input = new VNode("input", {
     attrs: { id: "chat-input", placeholder: "Type a message...", class: "chat-input" }
@@ -14,7 +17,7 @@ export function makeInputBox(app) {
     const inputEl = document.getElementById("chat-input");
     const value = inputEl.value.trim();
     if (!value) return;
-
+    socket.send((JSON.stringify({ type: "get_users", text: value })));
     app.state.messages.push({ author: "Me", text: value });
     inputEl.value = "";
 
