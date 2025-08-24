@@ -1,7 +1,6 @@
 import { VNode } from "../../Framework/over-react.js";
 import { makeChatApp } from "./chatApp.js";
-import { socket, Socket } from "../../static/ws.js";
-import { text } from "stream/consumers";
+import { socket } from "../../static/ws.js";
 
 export function makeInputBox(app) {
   const input = new VNode("input", {
