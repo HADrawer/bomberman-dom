@@ -1,5 +1,5 @@
 import { VNode } from "../../Framework/over-react.js";
-
+import { makeChatApp } from "./chatApp.js";
 export function makeInputBox(app) {
   const input = new VNode("input", {
     attrs: { id: "chat-input", placeholder: "Type a message...", class: "chat-input" }
@@ -11,11 +11,16 @@ export function makeInputBox(app) {
   }, app);
 
   button.listenEvent("onclick", () => {
-    const value = document.getElementById("chat-input").value.trim();
+    const inputEl = document.getElementById("chat-input");
+    const value = inputEl.value.trim();
     if (!value) return;
 
     app.state.messages.push({ author: "Me", text: value });
-    document.getElementById("chat-input").value = "";
+    inputEl.value = "";
+
+    // 🔑 Trigger UI re-render
+    app.vApp = makeChatApp(app);
+    app.update();
   });
 
   return new VNode("div", {

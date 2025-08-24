@@ -8,7 +8,7 @@ export function makeChatApp(app) {
     attrs: { class: "chat-container" },
     children: [
       makeHeader(),
-      makeMessageList(app),
+      makeMessageList(app),   // will rebuild from app.state.messages
       makeInputBox(app)
     ]
   });
