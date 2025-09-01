@@ -1,0 +1,60 @@
+body {
+  margin: 0;
+  background-image: url('/static/sprites/background.jpg');
+  background-repeat: repeat;      /* Repeat the tile */
+  background-size: auto;          /* Keep original tile size */
+  image-rendering: pixelated;     /* Sharp pixels */
+  font-family: "Courier New", monospace;
+}
+
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(13, 40px);
+  gap: 2px;
+  margin: 20px auto;
+  width: max-content;
+  /* border: 4px solid saddlebrown;
+  background: peru; */
+}
+
+.row {
+  display: contents; /* allows child .cell divs to participate in parent grid */
+}
+
+.cell {
+  width: 40px;
+  height: 40px;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Cell types with sprites */
+.cell.empty {
+  background-image: url('/static/sprites/sand.png');
+}
+
+.cell.wall-outer {
+  background-image: url('/static/sprites/hay.png');
+}
+
+.cell.wall-inner {
+  background-image: url('/static/sprites/pillar.png');
+}
+
+.cell.cactus {
+  background-image: url('/static/sprites/cactus.png');
+}
+
+.cell.barrel {
+  background-image: url('/static/sprites/barrel.png');
+}
+.cell.skull {
+  background-image: url('/static/sprites/skull.png');
+}
+.cell.gold {
+  background-image: url('/static/sprites/gold.png');
+}
+.cell.fire {
+  background-image: url('/static/sprites/fire.png');
+}
