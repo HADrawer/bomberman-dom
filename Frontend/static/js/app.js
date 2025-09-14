@@ -1,3 +1,4 @@
+import { socket } from "../ws.js";  
 document.addEventListener("DOMContentLoaded", () => {
   const app = document.getElementById("app");
 
@@ -19,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       localStorage.setItem("playerName", name);
+      socket.send(JSON.stringify({ type: "set_name", name }));
 
       loadWaitingRoom();
     });
