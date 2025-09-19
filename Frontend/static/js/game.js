@@ -11,8 +11,8 @@ export function startGame() {
     <div id="chat"></div>
   `;
 
-  // Build grid with VNodes
-  const gridVNode = createGrid(11, 15); // 10 rows × 15 cols
+
+  const gridVNode = createGrid(11, 15); 
   const gameArea = document.getElementById("gameArea");
   gameArea.appendChild(render(gridVNode));
 
