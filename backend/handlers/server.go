@@ -52,13 +52,12 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			Type string `json:"type"`
 		}
 		json.Unmarshal(message, &rawJson)
-		fmt.Println(message)
 
 		switch rawJson.Type {
-		case "message", "get_users", "get_chat_history", "new_message", "logout", "get_group_chat_history", "group_message":
+		case "send":
 			var myMessage MyMessage
 			json.Unmarshal(message, &myMessage)
-
+			fmt.Println("reviced==>", myMessage)
 			// Register connection only once per user
 			if currentUserID == "" {
 				currentUserID = myMessage.From
