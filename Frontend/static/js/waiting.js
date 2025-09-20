@@ -39,6 +39,7 @@ export async function showWaitingRoom() {
   const playerList = document.getElementById("player-list");
 
   let timeLeft = 15;
+  
 //   const connectedPlayers = new Set([playerName]);
 
 //   function logDebug(message) {
