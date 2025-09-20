@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -17,9 +18,22 @@ var upgrader = websocket.Upgrader{
 		return true // Allow all connections
 	},
 }
-var clients = make(map[*websocket.Conn]string) // conn -> username
-var mu sync.Mutex
+var (
+	 clients = make(map[*websocket.Conn]string) 
+	 mu sync.Mutex
+	 timerRunning = false
+	 timeLeft = 60
+	 stopTimer = make(chan bool)
 
+)
+
+func broadcast(msg interface{}) {
+    mu.Lock()
+    defer mu.Unlock()
+    for conn := range clients {
+        conn.WriteJSON(msg)
+    }
+}
 
 func broadcastMessage(message interface{}) {
     mu.Lock()
@@ -29,6 +43,43 @@ func broadcastMessage(message interface{}) {
     for client := range clients {
         client.WriteMessage(websocket.TextMessage, msgBytes)
     }
+}
+
+func startTimer(){
+	if timerRunning {
+		return
+	}
+	timerRunning = true
+
+	go func() {
+		timeLeft = 60
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if timeLeft > 0 {
+					broadcast(map[string]interface{}{
+						"type":      "timer",
+						"time_left": timeLeft,
+					})
+					timeLeft--
+				}else {
+					broadcast(map[string]interface{}{
+						"type": "start_game",
+					})
+					timerRunning = false
+					return
+				}
+			case <-stopTimer:
+				log.Println("Timer stopped (not enough players).")
+				timerRunning = false
+				timeLeft = 60
+				return
+			}
+		}
+		
+	}()
 }
 
 func sendPlayerList(conn *websocket.Conn) {
@@ -48,6 +99,24 @@ func sendPlayerList(conn *websocket.Conn) {
     playerListBytes, _ := json.Marshal(playerListMsg)
     conn.WriteMessage(websocket.TextMessage, playerListBytes)
     log.Printf("Sent player list to %s: %v", clients[conn], players)
+}
+
+func updateTimerBaseOnPlayers(){
+	mu.Lock()
+	count := len(clients)
+	mu.Unlock()
+
+	if count >= 2 && count <= 4 {
+		if !timerRunning {
+			log.Println("Starting timer...")
+			startTimer()
+		}
+	}else {
+		if timerRunning {
+			log.Println("Not enough players, stopping timer.")
+			stopTimer <- true
+		}
+	}
 }
 
 
@@ -82,6 +151,14 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
             mu.Unlock()
             
             log.Printf("User %s disconnected. Remaining: %d", currentUserID, len(clients))
+			updateTimerBaseOnPlayers()
+
+			broadcast(map[string]interface{}{
+				"type": "waiting",
+				"message": "Waiting for players...",
+			})
+
+			
         }
         conn.Close()
     })
@@ -154,7 +231,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// 	"text": fmt.Sprintf("👤 %s انضم إلى اللعبة", currentUserID),
 			// }
 			// systemBytes, _ := json.Marshal(systemMsg)
-
+			updateTimerBaseOnPlayers()
 			mu.Lock()
 			for client, username := range clients {
 				// Don't send the join notification to the user who just joined
@@ -173,6 +250,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		case "get_players":
 			log.Printf("Sending player list to %s", currentUserID)
 			sendPlayerList(conn)
+			updateTimerBaseOnPlayers()
 
 		case "message", "get_users", "get_chat_history", "new_message", "logout", "get_group_chat_history", "group_message":
 			var myMessage MyMessage

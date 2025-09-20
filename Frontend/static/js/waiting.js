@@ -14,8 +14,7 @@ export async function showWaitingRoom() {
       <h1>Waiting Room</h1>
       <p>Welcome <strong>${playerName}</strong> 👋</p>
       <p>Waiting another players...</p>
-      <p id="timer">⏳ 15 ثانية متبقية...</p>
-      <button id="startGameBtn" disabled>ابدأ اللعبة</button>
+      <p id="timer">⏳ Waiting...</p>
 
        <div id="players">
         <h3>Connected Players:</h3>
@@ -38,8 +37,8 @@ export async function showWaitingRoom() {
 //   const debugDiv = document.getElementById("debug");
   const playerList = document.getElementById("player-list");
 
-  let timeLeft = 15;
   
+
 //   const connectedPlayers = new Set([playerName]);
 
 //   function logDebug(message) {
@@ -53,22 +52,9 @@ export async function showWaitingRoom() {
 //     logDebug(`Waiting room loaded for: ${playerName}`);
 
 
-  const countdown = setInterval(() => {
-    timeLeft--;
-    timerEl.textContent = `⏳ ${timeLeft} ثانية متبقية...`;
 
-    if (timeLeft <= 0) {
-      clearInterval(countdown);
-      timerEl.textContent = "✅ يمكنك بدء اللعبة الآن!";
-      startBtn.disabled = false;
-    }
-  }, 1000);
 
-  startBtn.addEventListener("click", () => {
-    import("./game.js").then(module => {
-      module.startGame();
-    });
-  });
+ 
 
 socket.addEventListener("message", (event) => {
      try {
@@ -91,6 +77,18 @@ socket.addEventListener("message", (event) => {
         else if (msg.type === "user_left") {
             connectedPlayers.delete(msg.name);
             updatePlayersList();
+        }
+        else if (msg.type === "timer"){
+            timerEl.textContent = `⏳ ${msg.time_left} second left...`
+        }
+        else if (msg.type === "waiting") {
+            timerEl.textContent = msg.message   
+        }
+        else if (msg.type === "start_game"){
+            timerEl.textContent = "🚀 Game started!";
+        import("./game.js").then(module => {
+          module.startGame();
+        }); 
         }
 
     } catch (error) {
