@@ -16,7 +16,7 @@ export function makeInputBox(app) {
     const inputEl = document.getElementById("chat-input");
     const value = inputEl.value.trim();
     if (!value) return;
-    socket.send((JSON.stringify({ type: "get_users", text: value })));
+    socket.send((JSON.stringify({ type: "send", text: value })));
     app.state.messages.push({ author: "Me", text: value });
     inputEl.value = "";
 
