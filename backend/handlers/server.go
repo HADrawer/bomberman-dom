@@ -7,8 +7,13 @@ import (
 	"net/http"
 	"sync"
 	"time"
+    "math/rand"
 
 	"github.com/gorilla/websocket"
+)
+var (
+    currentGrid Grid
+    gamePlayers []Player
 )
 
 var upgrader = websocket.Upgrader{
@@ -22,7 +27,7 @@ var (
 	 clients = make(map[*websocket.Conn]string) 
 	 mu sync.Mutex
 	 timerRunning = false
-	 timeLeft = 60
+	 timeLeft = 10
 	 stopTimer = make(chan bool)
 
 )
@@ -45,14 +50,14 @@ func broadcastMessage(message interface{}) {
     }
 }
 
-func startTimer(){
+func startTimer() {
 	if timerRunning {
 		return
 	}
 	timerRunning = true
 
 	go func() {
-		timeLeft = 60
+		timeLeft = 10
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -64,23 +69,31 @@ func startTimer(){
 						"time_left": timeLeft,
 					})
 					timeLeft--
-				}else {
+				} else {
+					// Generate grid + players once when timer finishes
+					currentGrid = generateGrid(11, 15) // same dimensions as frontend
+					gamePlayers = assignPlayers()
+
+					// Broadcast game start with grid + players
 					broadcast(map[string]interface{}{
-						"type": "start_game",
+						"type":    "start_game",
+						"grid":    currentGrid,
+						"players": gamePlayers,
 					})
+
 					timerRunning = false
 					return
 				}
 			case <-stopTimer:
 				log.Println("Timer stopped (not enough players).")
 				timerRunning = false
-				timeLeft = 60
+				timeLeft = 10
 				return
 			}
 		}
-		
 	}()
 }
+
 
 func sendPlayerList(conn *websocket.Conn) {
     mu.Lock()
@@ -262,7 +275,146 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				//registerSocket(currentUserID, conn)
 			}
 
-			//handleWebSocketMessage(app, conn, myMessage)
+			case "move":
+    var moveMsg struct {
+        ID        string `json:"id"`
+        Direction string `json:"direction"`
+    }
+    if err := json.Unmarshal(message, &moveMsg); err != nil {
+        log.Printf("Error parsing move message: %v", err)
+        continue
+    }
+
+    // Find the player
+    mu.Lock()
+    for i, p := range gamePlayers {
+        if p.ID == moveMsg.ID {
+            newX, newY := p.X, p.Y
+
+            switch moveMsg.Direction {
+            case "up":
+                newY--
+            case "down":
+                newY++
+            case "left":
+                newX--
+            case "right":
+                newX++
+            }
+
+            // Collision check: stay inside bounds & not a wall
+            if newY >= 0 && newY < currentGrid.Rows &&
+               newX >= 0 && newX < currentGrid.Cols &&
+               currentGrid.Cells[newY][newX].Type == "sand" {
+
+                gamePlayers[i].X = newX
+                gamePlayers[i].Y = newY
+            }
+
+            // Broadcast updated player position
+            broadcast(map[string]interface{}{
+                "type":   "player_moved",
+                "id":     p.ID,
+                "x":      gamePlayers[i].X,
+                "y":      gamePlayers[i].Y,
+                "name":   p.Name,
+            })
+            break
+        }
+    }
+    mu.Unlock()
+
+
+  
+
 		}
+		
 	}
+}
+// Generate grid once per game
+func generateGrid(rows, cols int) Grid {
+    grid := Grid{
+        Rows:  rows,
+        Cols:  cols,
+        Cells: make([][]Cell, rows),
+    }
+
+    // Predefined start zones
+    startZones := [][2]int{
+        {1, 1},
+        {1, cols - 2},
+        {rows - 2, 1},
+        {rows - 2, cols - 2},
+    }
+
+    // Helper: is near start zone (3x3 area)
+    isNearStartZone := func(r, c int) bool {
+        for _, sz := range startZones {
+            if abs(r-sz[0]) <= 1 && abs(c-sz[1]) <= 1 {
+                return true
+            }
+        }
+        return false
+    }
+
+    for r := 0; r < rows; r++ {
+        grid.Cells[r] = make([]Cell, cols)
+        for c := 0; c < cols; c++ {
+            cellType := "sand"
+
+            // Outer walls
+            if r == 0 || r == rows-1 || c == 0 || c == cols-1 {
+                cellType = "wall"
+            } else if (r == 1 && (c == 1 || c == cols-2)) ||
+                (r == rows-2 && (c == 1 || c == cols-2)) {
+                cellType = "start-zone"
+            } else if r%2 == 0 && c%2 == 0 {
+                cellType = "inner-wall"
+            } else {
+                // Random destructible stones (40%), not near start
+                if rand.Float64() < 0.4 && !isNearStartZone(r, c) {
+                    cellType = "stone"
+                }
+            }
+
+            grid.Cells[r][c] = Cell{Type: cellType}
+        }
+    }
+
+    return grid
+}
+
+func abs(x int) int {
+    if x < 0 {
+        return -x
+    }
+    return x
+}
+
+
+// Predefined spawn points (match your JS safe zones)
+var spawnPoints = [][2]int{
+    {1, 1},           // Top-left
+    {1, 13},          // Top-right
+    {9, 1},           // Bottom-left
+    {9, 13},          // Bottom-right
+}
+
+func assignPlayers() []Player {
+    players := []Player{}
+    i := 0
+    for _, username := range clients {
+        if i >= len(spawnPoints) {
+            break // max 4 players
+        }
+        spawn := spawnPoints[i]
+        players = append(players, Player{
+            ID:   fmt.Sprintf("p%d", i+1),
+            X:    spawn[1],
+            Y:    spawn[0],
+            Name: username,
+        })
+        i++
+    }
+    return players
 }

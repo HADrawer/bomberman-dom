@@ -4,6 +4,21 @@ export function createGrid() {
   const rows = 11;
   const cols = 15;
 
+  // Start zone positions
+  const startZones = [
+    [1, 1],
+    [1, cols - 2],
+    [rows - 2, 1],
+    [rows - 2, cols - 2]
+  ];
+
+  // Function to check if cell is near a start zone (3x3 around it)
+  function isNearStartZone(r, c) {
+    return startZones.some(([sr, sc]) => {
+      return Math.abs(r - sr) <= 1 && Math.abs(c - sc) <= 1;
+    });
+  }
+
   return new VNode("div", {
     attrs: { class: "grid" },
     children: Array.from({ length: rows }, (_, r) => {
@@ -16,7 +31,7 @@ export function createGrid() {
           if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) {
             cellType = "wall";
           } 
-          // Player start zones (single cell)
+          // Player start zones
           else if (
             (r === 1 && (c === 1 || c === cols - 2)) ||
             (r === rows - 2 && (c === 1 || c === cols - 2))
@@ -31,8 +46,8 @@ export function createGrid() {
           else {
             cellType = "sand";
 
-            // Random destructible stone on sand (not in start zone)
-            if (Math.random() < 0.2) {
+            // Random destructible stone (higher chance: 40%)
+            if (Math.random() < 0.4 && !isNearStartZone(r, c)) {
               cellType = "stone";
             }
           }

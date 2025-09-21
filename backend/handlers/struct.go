@@ -194,3 +194,24 @@ type ServerComment struct {
 type AllUsers struct{
 	Username string `json:"username"`
 }
+
+
+// Game grid cell
+type Cell struct {
+    Type string `json:"type"`
+}
+
+// Full grid
+type Grid struct {
+    Rows  int       `json:"rows"`
+    Cols  int       `json:"cols"`
+    Cells [][]Cell  `json:"cells"`
+}
+
+// Player info
+type Player struct {
+    ID   string `json:"id"`
+    X    int    `json:"x"`
+    Y    int    `json:"y"`
+    Name string `json:"name"`
+}

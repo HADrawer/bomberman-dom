@@ -87,7 +87,7 @@ socket.addEventListener("message", (event) => {
         else if (msg.type === "start_game"){
             timerEl.textContent = "🚀 Game started!";
         import("./game.js").then(module => {
-          module.startGame();
+          module.startGame(msg.grid, msg.players);
         }); 
         }
 

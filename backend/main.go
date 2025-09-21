@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	    "math/rand"
+    "time"
+
 )
 
 func main() {
+    rand.Seed(time.Now().UnixNano())
 
 	mux := http.NewServeMux()
 
