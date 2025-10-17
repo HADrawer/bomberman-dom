@@ -4,16 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"sync"
 	"time"
-    "math/rand"
 
 	"github.com/gorilla/websocket"
 )
+
 var (
-    currentGrid Grid
-    gamePlayers []Player
+	currentGrid Grid
+	gamePlayers []Player
 )
 
 var upgrader = websocket.Upgrader{
@@ -24,30 +25,29 @@ var upgrader = websocket.Upgrader{
 	},
 }
 var (
-	 clients = make(map[*websocket.Conn]string) 
-	 mu sync.Mutex
-	 timerRunning = false
-	 timeLeft = 10
-	 stopTimer = make(chan bool)
-
+	clients      = make(map[*websocket.Conn]string)
+	mu           sync.Mutex
+	timerRunning = false
+	timeLeft     = 10
+	stopTimer    = make(chan bool)
 )
 
 func broadcast(msg interface{}) {
-    mu.Lock()
-    defer mu.Unlock()
-    for conn := range clients {
-        conn.WriteJSON(msg)
-    }
+	mu.Lock()
+	defer mu.Unlock()
+	for conn := range clients {
+		conn.WriteJSON(msg)
+	}
 }
 
 func broadcastMessage(message interface{}) {
-    mu.Lock()
-    defer mu.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 
-    msgBytes, _ := json.Marshal(message)
-    for client := range clients {
-        client.WriteMessage(websocket.TextMessage, msgBytes)
-    }
+	msgBytes, _ := json.Marshal(message)
+	for client := range clients {
+		client.WriteMessage(websocket.TextMessage, msgBytes)
+	}
 }
 
 func startTimer() {
@@ -94,27 +94,26 @@ func startTimer() {
 	}()
 }
 
-
 func sendPlayerList(conn *websocket.Conn) {
-    mu.Lock()
-    defer mu.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 
-    players := make([]string, 0, len(clients))
-    for _, username := range clients {
-        players = append(players, username)
-    }
+	players := make([]string, 0, len(clients))
+	for _, username := range clients {
+		players = append(players, username)
+	}
 
-    playerListMsg := map[string]interface{}{
-        "type":    "player_list",
-        "players": players,
-    }
-    
-    playerListBytes, _ := json.Marshal(playerListMsg)
-    conn.WriteMessage(websocket.TextMessage, playerListBytes)
-    log.Printf("Sent player list to %s: %v", clients[conn], players)
+	playerListMsg := map[string]interface{}{
+		"type":    "player_list",
+		"players": players,
+	}
+
+	playerListBytes, _ := json.Marshal(playerListMsg)
+	conn.WriteMessage(websocket.TextMessage, playerListBytes)
+	log.Printf("Sent player list to %s: %v", clients[conn], players)
 }
 
-func updateTimerBaseOnPlayers(){
+func updateTimerBaseOnPlayers() {
 	mu.Lock()
 	count := len(clients)
 	mu.Unlock()
@@ -124,7 +123,7 @@ func updateTimerBaseOnPlayers(){
 			log.Println("Starting timer...")
 			startTimer()
 		}
-	}else {
+	} else {
 		if timerRunning {
 			log.Println("Not enough players, stopping timer.")
 			stopTimer <- true
@@ -132,50 +131,47 @@ func updateTimerBaseOnPlayers(){
 	}
 }
 
-
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
 	}
-	
 
 	var currentUserID string
 	var once sync.Once
 	closeConn := func() {
-    once.Do(func() {
-        if currentUserID != "" {
-            mu.Lock()
-            delete(clients, conn)
-            mu.Unlock()
+		once.Do(func() {
+			if currentUserID != "" {
+				mu.Lock()
+				delete(clients, conn)
+				mu.Unlock()
 
-            // Notify others that this user left
-            leaveMsg := map[string]interface{}{
-                "type": "user_left",
-                "name": currentUserID,
-            }
-            leaveBytes, _ := json.Marshal(leaveMsg)
-            
-            mu.Lock()
-            for client := range clients {
-                client.WriteMessage(websocket.TextMessage, leaveBytes)
-            }
-            mu.Unlock()
-            
-            log.Printf("User %s disconnected. Remaining: %d", currentUserID, len(clients))
-			updateTimerBaseOnPlayers()
+				// Notify others that this user left
+				leaveMsg := map[string]interface{}{
+					"type": "user_left",
+					"name": currentUserID,
+				}
+				leaveBytes, _ := json.Marshal(leaveMsg)
 
-			broadcast(map[string]interface{}{
-				"type": "waiting",
-				"message": "Waiting for players...",
-			})
+				mu.Lock()
+				for client := range clients {
+					client.WriteMessage(websocket.TextMessage, leaveBytes)
+				}
+				mu.Unlock()
 
-			
-        }
-        conn.Close()
-    })
-}
+				log.Printf("User %s disconnected. Remaining: %d", currentUserID, len(clients))
+				updateTimerBaseOnPlayers()
+
+				broadcast(map[string]interface{}{
+					"type":    "waiting",
+					"message": "Waiting for players...",
+				})
+
+			}
+			conn.Close()
+		})
+	}
 
 	defer closeConn()
 
@@ -192,7 +188,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		var msgType struct {
 			Type string `json:"type"`
 		}
-		 if err := json.Unmarshal(message, &msgType); err != nil {
+		if err := json.Unmarshal(message, &msgType); err != nil {
 			log.Printf("Error parsing message type: %v", err)
 			continue
 		}
@@ -206,14 +202,14 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Error parsing set_name message: %v", err)
 				continue
 			}
-			
+
 			// Extract the name field
 			name, ok := msg["name"].(string)
 			if !ok || name == "" {
 				log.Printf("Invalid or empty name received")
 				continue
 			}
-			
+
 			currentUserID = name
 			log.Printf("User set name: %s. Total clients: %d", currentUserID, len(clients))
 
@@ -240,7 +236,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			userJoinedBytes, _ := json.Marshal(userJoinedMsg)
 
 			// systemMsg := map[string]interface{}{
-			// 	"type": "system", 
+			// 	"type": "system",
 			// 	"text": fmt.Sprintf("👤 %s انضم إلى اللعبة", currentUserID),
 			// }
 			// systemBytes, _ := json.Marshal(systemMsg)
@@ -258,163 +254,170 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// // Send current player list to the new user
 			// sendPlayerList(conn)
-			
 
 		case "get_players":
 			log.Printf("Sending player list to %s", currentUserID)
 			sendPlayerList(conn)
 			updateTimerBaseOnPlayers()
 
-		case "message", "get_users", "get_chat_history", "new_message", "logout", "get_group_chat_history", "group_message":
+		case "message":
 			var myMessage MyMessage
 			json.Unmarshal(message, &myMessage)
+			log.Printf("Message from %s: %s", currentUserID, myMessage.Text)
 
+			for client := range clients {
+				if currentUserID == clients[client] {
+					continue // Skip sender
+				}
+				var sendMessage MyMessage
+				sendMessage.Type = "message"
+				sendMessage.From = currentUserID
+				sendMessage.Text = myMessage.Text
+				client.WriteJSON(sendMessage)
+			}
 			// Register connection only once per user
 			if currentUserID == "" {
 				currentUserID = myMessage.From
 				//registerSocket(currentUserID, conn)
 			}
 
-			case "move":
-    var moveMsg struct {
-        ID        string `json:"id"`
-        Direction string `json:"direction"`
-    }
-    if err := json.Unmarshal(message, &moveMsg); err != nil {
-        log.Printf("Error parsing move message: %v", err)
-        continue
-    }
+		case "move":
+			var moveMsg struct {
+				ID        string `json:"id"`
+				Direction string `json:"direction"`
+			}
+			if err := json.Unmarshal(message, &moveMsg); err != nil {
+				log.Printf("Error parsing move message: %v", err)
+				continue
+			}
 
-    // Find the player
-    mu.Lock()
-    for i, p := range gamePlayers {
-        if p.ID == moveMsg.ID {
-            newX, newY := p.X, p.Y
+			// Find the player
+			mu.Lock()
+			for i, p := range gamePlayers {
+				if p.ID == moveMsg.ID {
+					newX, newY := p.X, p.Y
 
-            switch moveMsg.Direction {
-            case "up":
-                newY--
-            case "down":
-                newY++
-            case "left":
-                newX--
-            case "right":
-                newX++
-            }
+					switch moveMsg.Direction {
+					case "up":
+						newY--
+					case "down":
+						newY++
+					case "left":
+						newX--
+					case "right":
+						newX++
+					}
 
-            // Collision check: stay inside bounds & not a wall
-            if newY >= 0 && newY < currentGrid.Rows &&
-               newX >= 0 && newX < currentGrid.Cols &&
-               currentGrid.Cells[newY][newX].Type == "sand" {
+					// Collision check: stay inside bounds & not a wall
+					if newY >= 0 && newY < currentGrid.Rows &&
+						newX >= 0 && newX < currentGrid.Cols &&
+						currentGrid.Cells[newY][newX].Type == "sand" {
 
-                gamePlayers[i].X = newX
-                gamePlayers[i].Y = newY
-            }
+						gamePlayers[i].X = newX
+						gamePlayers[i].Y = newY
+					}
 
-            // Broadcast updated player position
-            broadcast(map[string]interface{}{
-                "type":   "player_moved",
-                "id":     p.ID,
-                "x":      gamePlayers[i].X,
-                "y":      gamePlayers[i].Y,
-                "name":   p.Name,
-            })
-            break
-        }
-    }
-    mu.Unlock()
-
-
-  
+					// Broadcast updated player position
+					broadcast(map[string]interface{}{
+						"type": "player_moved",
+						"id":   p.ID,
+						"x":    gamePlayers[i].X,
+						"y":    gamePlayers[i].Y,
+						"name": p.Name,
+					})
+					break
+				}
+			}
+			mu.Unlock()
 
 		}
-		
+
 	}
 }
+
 // Generate grid once per game
 func generateGrid(rows, cols int) Grid {
-    grid := Grid{
-        Rows:  rows,
-        Cols:  cols,
-        Cells: make([][]Cell, rows),
-    }
+	grid := Grid{
+		Rows:  rows,
+		Cols:  cols,
+		Cells: make([][]Cell, rows),
+	}
 
-    // Predefined start zones
-    startZones := [][2]int{
-        {1, 1},
-        {1, cols - 2},
-        {rows - 2, 1},
-        {rows - 2, cols - 2},
-    }
+	// Predefined start zones
+	startZones := [][2]int{
+		{1, 1},
+		{1, cols - 2},
+		{rows - 2, 1},
+		{rows - 2, cols - 2},
+	}
 
-    // Helper: is near start zone (3x3 area)
-    isNearStartZone := func(r, c int) bool {
-        for _, sz := range startZones {
-            if abs(r-sz[0]) <= 1 && abs(c-sz[1]) <= 1 {
-                return true
-            }
-        }
-        return false
-    }
+	// Helper: is near start zone (3x3 area)
+	isNearStartZone := func(r, c int) bool {
+		for _, sz := range startZones {
+			if abs(r-sz[0]) <= 1 && abs(c-sz[1]) <= 1 {
+				return true
+			}
+		}
+		return false
+	}
 
-    for r := 0; r < rows; r++ {
-        grid.Cells[r] = make([]Cell, cols)
-        for c := 0; c < cols; c++ {
-            cellType := "sand"
+	for r := 0; r < rows; r++ {
+		grid.Cells[r] = make([]Cell, cols)
+		for c := 0; c < cols; c++ {
+			cellType := "sand"
 
-            // Outer walls
-            if r == 0 || r == rows-1 || c == 0 || c == cols-1 {
-                cellType = "wall"
-            } else if (r == 1 && (c == 1 || c == cols-2)) ||
-                (r == rows-2 && (c == 1 || c == cols-2)) {
-                cellType = "start-zone"
-            } else if r%2 == 0 && c%2 == 0 {
-                cellType = "inner-wall"
-            } else {
-                // Random destructible stones (40%), not near start
-                if rand.Float64() < 0.4 && !isNearStartZone(r, c) {
-                    cellType = "stone"
-                }
-            }
+			// Outer walls
+			if r == 0 || r == rows-1 || c == 0 || c == cols-1 {
+				cellType = "wall"
+			} else if (r == 1 && (c == 1 || c == cols-2)) ||
+				(r == rows-2 && (c == 1 || c == cols-2)) {
+				cellType = "start-zone"
+			} else if r%2 == 0 && c%2 == 0 {
+				cellType = "inner-wall"
+			} else {
+				// Random destructible stones (40%), not near start
+				if rand.Float64() < 0.4 && !isNearStartZone(r, c) {
+					cellType = "stone"
+				}
+			}
 
-            grid.Cells[r][c] = Cell{Type: cellType}
-        }
-    }
+			grid.Cells[r][c] = Cell{Type: cellType}
+		}
+	}
 
-    return grid
+	return grid
 }
 
 func abs(x int) int {
-    if x < 0 {
-        return -x
-    }
-    return x
+	if x < 0 {
+		return -x
+	}
+	return x
 }
-
 
 // Predefined spawn points (match your JS safe zones)
 var spawnPoints = [][2]int{
-    {1, 1},           // Top-left
-    {1, 13},          // Top-right
-    {9, 1},           // Bottom-left
-    {9, 13},          // Bottom-right
+	{1, 1},  // Top-left
+	{1, 13}, // Top-right
+	{9, 1},  // Bottom-left
+	{9, 13}, // Bottom-right
 }
 
 func assignPlayers() []Player {
-    players := []Player{}
-    i := 0
-    for _, username := range clients {
-        if i >= len(spawnPoints) {
-            break // max 4 players
-        }
-        spawn := spawnPoints[i]
-        players = append(players, Player{
-            ID:   fmt.Sprintf("p%d", i+1),
-            X:    spawn[1],
-            Y:    spawn[0],
-            Name: username,
-        })
-        i++
-    }
-    return players
+	players := []Player{}
+	i := 0
+	for _, username := range clients {
+		if i >= len(spawnPoints) {
+			break // max 4 players
+		}
+		spawn := spawnPoints[i]
+		players = append(players, Player{
+			ID:   fmt.Sprintf("p%d", i+1),
+			X:    spawn[1],
+			Y:    spawn[0],
+			Name: username,
+		})
+		i++
+	}
+	return players
 }
