@@ -4,9 +4,10 @@ export function startGame(grid, players) {
   const app = document.getElementById("app");
   app.innerHTML = `
     <div class="container">
-      <h1>🚀 اللعبة بدأت!</h1>
+      <h1>Game Started</h1>
       <div id="gameArea" class="grid"></div>
     </div>
+    <p>Click on the grid and use WASD / Arrow keys to move.</p>
     <div id="chat"></div>
   `;
 
@@ -31,49 +32,30 @@ players.forEach(p => {
   const playerEl = document.createElement("div");
   playerEl.className = "player";
   playerEl.id = p.id;
-  // remove any textContent! your CSS handles the PNG avatar
   placePlayerInCell(playerEl, p.y, p.x);
 });
 
+const myPlayer = players.find(p => p.name === localStorage.getItem("playerName"));
 
-  // 3. Listen for all movement updates (server should broadcast all moves)
-socket.addEventListener("message", (event) => {
-  const msg = JSON.parse(event.data);
+if (myPlayer) {
+  document.addEventListener("keydown", (e) => {
+    let dir;
+    if (e.key === "ArrowUp" || e.key === "w") dir = "up";
+    if (e.key === "ArrowDown" || e.key === "s") dir = "down";
+    if (e.key === "ArrowLeft" || e.key === "a") dir = "left";
+    if (e.key === "ArrowRight" || e.key === "d") dir = "right";
 
-  if (msg.type === "player_joined") {
-    const p = msg.player;
-    const playerEl = document.createElement("div");
-    playerEl.className = "player";
-    playerEl.id = p.ID;  // use ID exactly
-    placePlayerInCell(playerEl, p.Y, p.X); // spawn in correct cell
-  }
-
-  if (msg.type === "player_moved") {
-    const playerEl = document.getElementById(msg.id);
-    if (playerEl) placePlayerInCell(playerEl, msg.y, msg.x);
-  }
-});
+    if (dir) {
+      socket.send(JSON.stringify({
+        type: "move",
+        direction: dir
+      }));
+    }
+  });
+}
 
 
-  // 4. Handle your player movement
-  const myPlayer = players.find(p => p.name === localStorage.getItem("playerName"));
-  if (myPlayer) {
-    document.addEventListener("keydown", (e) => {
-      let dir;
-      if (e.key === "ArrowUp" || e.key === "w") dir = "up";
-      if (e.key === "ArrowDown" || e.key === "s") dir = "down";
-      if (e.key === "ArrowLeft" || e.key === "a") dir = "left";
-      if (e.key === "ArrowRight" || e.key === "d") dir = "right";
 
-      if (dir) {
-        socket.send(JSON.stringify({
-          type: "move",
-          id: myPlayer.id,
-          direction: dir
-        }));
-      }
-    });
-  }
 
   // Load chat
   import("../chat/app.js").then(chat => {
@@ -81,13 +63,53 @@ socket.addEventListener("message", (event) => {
   });
 }
 
-// Insert player into a cell
-// Insert player into a cell
+
 function placePlayerInCell(playerEl, row, col) {
   const cellEl = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
   if (cellEl) {
     // Remove from previous parent if any
     if (playerEl.parentElement) playerEl.parentElement.removeChild(playerEl);
     cellEl.appendChild(playerEl);
+  }
+}
+
+socket.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+
+  switch (msg.type) {
+    case "player_joined": {
+      const p = msg.player;
+      if (!document.getElementById(p.id)) {
+        const playerEl = document.createElement("div");
+        playerEl.className = "player";
+        playerEl.id = p.id;
+        placePlayerInCell(playerEl, p.y, p.x);
+      }
+      break;
+    }
+
+    case "player_moved": {
+       console.log("Received move:", msg);
+      const playerEl = document.getElementById(msg.id);
+      if (playerEl)
+        { 
+          placePlayerInCell(playerEl,msg.y,msg.x);
+        }else {
+           const newPlayer = document.createElement("div");
+        newPlayer.className = "player";
+        newPlayer.id = msg.id;
+        placePlayerInCell(newPlayer, msg.y, msg.x);
+        }
+          break;
+    }
+
+    case "player_left": {
+      const playerEl = document.getElementById(msg.id);
+      if (playerEl) playerEl.remove();
+      break;
+    }
+
+    default:
+      console.log("Unknown message:", msg);
   }
 }

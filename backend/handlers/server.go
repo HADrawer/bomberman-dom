@@ -30,6 +30,8 @@ var (
 	timerRunning = false
 	timeLeft     = 10
 	stopTimer    = make(chan bool)
+	connToPlayerID = make(map[*websocket.Conn]string)
+
 )
 
 func broadcast(msg interface{}) {
@@ -80,6 +82,16 @@ func startTimer() {
 						"grid":    currentGrid,
 						"players": gamePlayers,
 					})
+					mu.Lock()
+					for conn, username := range clients {
+						for _, p := range gamePlayers {
+							if p.Name == username {
+								connToPlayerID[conn] = p.ID
+								break
+							}
+						}
+					}
+					mu.Unlock()
 
 					timerRunning = false
 					return
@@ -283,18 +295,21 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		case "move":
 			var moveMsg struct {
-				ID        string `json:"id"`
 				Direction string `json:"direction"`
 			}
 			if err := json.Unmarshal(message, &moveMsg); err != nil {
 				log.Printf("Error parsing move message: %v", err)
 				continue
 			}
+			playerID , ok := connToPlayerID[conn]
+			if !ok {
+				log.Println("Unknown connection tried to move.")
+			}
 
 			// Find the player
 			mu.Lock()
 			for i, p := range gamePlayers {
-				if p.ID == moveMsg.ID {
+				if p.ID == playerID {
 					newX, newY := p.X, p.Y
 
 					switch moveMsg.Direction {
@@ -321,9 +336,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 					broadcast(map[string]interface{}{
 						"type": "player_moved",
 						"id":   p.ID,
+						"name": p.Name,
 						"x":    gamePlayers[i].X,
 						"y":    gamePlayers[i].Y,
-						"name": p.Name,
 					})
 					break
 				}
