@@ -25,13 +25,12 @@ var upgrader = websocket.Upgrader{
 	},
 }
 var (
-	clients      = make(map[*websocket.Conn]string)
-	mu           sync.Mutex
-	timerRunning = false
-	timeLeft     = 10
-	stopTimer    = make(chan bool)
+	clients        = make(map[*websocket.Conn]string)
+	mu             sync.Mutex
+	timerRunning   = false
+	timeLeft       = 10
+	stopTimer      = make(chan bool)
 	connToPlayerID = make(map[*websocket.Conn]string)
-
 )
 
 func broadcast(msg interface{}) {
@@ -59,7 +58,7 @@ func startTimer() {
 	timerRunning = true
 
 	go func() {
-		timeLeft = 10
+		timeLeft = 60
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -223,7 +222,8 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 			currentUserID = name
-			log.Printf("User set name: %s. Total clients: %d", currentUserID, len(clients))
+			log.Printf("User set name: %s. Total clients: %d, ", currentUserID, len(clients))
+			log.Printf("Current clients: %v", clients)
 
 			// Add client to map
 			mu.Lock()
@@ -286,6 +286,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				sendMessage.From = currentUserID
 				sendMessage.Text = myMessage.Text
 				client.WriteJSON(sendMessage)
+				log.Printf("Sent message to %s", clients[client])
 			}
 			// Register connection only once per user
 			if currentUserID == "" {
@@ -301,7 +302,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Error parsing move message: %v", err)
 				continue
 			}
-			playerID , ok := connToPlayerID[conn]
+			playerID, ok := connToPlayerID[conn]
 			if !ok {
 				log.Println("Unknown connection tried to move.")
 			}
