@@ -58,7 +58,7 @@ func startTimer() {
 	timerRunning = true
 
 	go func() {
-		timeLeft = 60
+		timeLeft = 10
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -71,7 +71,6 @@ func startTimer() {
 					})
 					timeLeft--
 				} else {
-					// Generate grid + players once when timer finishes
 					currentGrid = generateGrid(11, 15) // same dimensions as frontend
 					gamePlayers = assignPlayers()
 
@@ -233,7 +232,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// Send welcome message to the new user
 			welcomeMsg := map[string]interface{}{
 				"type": "system",
-				"text": fmt.Sprintf("مرحباً %s! انتظر اللاعبين الآخرين", currentUserID),
+				"text": fmt.Sprintf("Hello %s , Waiting another players", currentUserID),
 			}
 			welcomeBytes, _ := json.Marshal(welcomeMsg)
 			conn.WriteMessage(websocket.TextMessage, welcomeBytes)
@@ -296,55 +295,21 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		case "move":
 			var moveMsg struct {
+				ID        string `json:"id"`
 				Direction string `json:"direction"`
 			}
 			if err := json.Unmarshal(message, &moveMsg); err != nil {
 				log.Printf("Error parsing move message: %v", err)
 				continue
 			}
-			playerID, ok := connToPlayerID[conn]
-			if !ok {
-				log.Println("Unknown connection tried to move.")
-			}
+			println( "ID: " + moveMsg.ID + " arrived here")
+			println( "Direction: " + moveMsg.Direction + " arrived here")
+			// playerID, ok := connToPlayerID[conn]
+			// if !ok {
+			// 	log.Println("Unknown connection tried to move.")
+			// }
 
-			// Find the player
-			mu.Lock()
-			for i, p := range gamePlayers {
-				if p.ID == playerID {
-					newX, newY := p.X, p.Y
-
-					switch moveMsg.Direction {
-					case "up":
-						newY--
-					case "down":
-						newY++
-					case "left":
-						newX--
-					case "right":
-						newX++
-					}
-
-					// Collision check: stay inside bounds & not a wall
-					if newY >= 0 && newY < currentGrid.Rows &&
-						newX >= 0 && newX < currentGrid.Cols &&
-						currentGrid.Cells[newY][newX].Type == "sand" {
-
-						gamePlayers[i].X = newX
-						gamePlayers[i].Y = newY
-					}
-
-					// Broadcast updated player position
-					broadcast(map[string]interface{}{
-						"type": "player_moved",
-						"id":   p.ID,
-						"name": p.Name,
-						"x":    gamePlayers[i].X,
-						"y":    gamePlayers[i].Y,
-					})
-					break
-				}
-			}
-			mu.Unlock()
+			go movePlayer(moveMsg.ID, moveMsg.Direction)
 
 		}
 
@@ -436,4 +401,44 @@ func assignPlayers() []Player {
 		i++
 	}
 	return players
+}
+
+func movePlayer(id, dir string) {
+	print("second befpre send333")
+	
+	print("second 222 befpre send")
+	for i, p := range gamePlayers {
+		if p.ID == id {
+			newX, newY := p.X, p.Y
+			switch dir {
+			case "up":
+				newY--
+			case "down":
+				newY++
+			case "left":
+				newX--
+			case "right":
+				newX++
+			}
+			print("asd befpre send")
+			if newY >= 0 && newY < currentGrid.Rows &&
+				newX >= 0 && newX < currentGrid.Cols {
+
+				cellType := currentGrid.Cells[newY][newX].Type
+				if cellType == "sand" || cellType == "start-zone" {
+					gamePlayers[i].X = newX
+					gamePlayers[i].Y = newY
+				}
+			}
+			print("second befpre send")
+			broadcast(map[string]interface{}{
+				"type": "player_moved",
+				"id":   p.ID,
+				"x":    gamePlayers[i].X,
+				"y":    gamePlayers[i].Y,
+				"name": p.Name,
+			})
+			break
+		}
+	}
 }
