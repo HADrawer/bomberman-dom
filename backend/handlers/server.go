@@ -404,9 +404,7 @@ func assignPlayers() []Player {
 }
 
 func movePlayer(id, dir string) {
-	print("second befpre send333")
-	
-	print("second 222 befpre send")
+
 	for i, p := range gamePlayers {
 		if p.ID == id {
 			newX, newY := p.X, p.Y
@@ -430,7 +428,6 @@ func movePlayer(id, dir string) {
 					gamePlayers[i].Y = newY
 				}
 			}
-			print("second befpre send")
 			broadcast(map[string]interface{}{
 				"type": "player_moved",
 				"id":   p.ID,
