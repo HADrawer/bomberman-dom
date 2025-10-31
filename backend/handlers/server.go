@@ -302,8 +302,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Error parsing move message: %v", err)
 				continue
 			}
-			println( "ID: " + moveMsg.ID + " arrived here")
-			println( "Direction: " + moveMsg.Direction + " arrived here")
+			
 			// playerID, ok := connToPlayerID[conn]
 			// if !ok {
 			// 	log.Println("Unknown connection tried to move.")
@@ -404,7 +403,8 @@ func assignPlayers() []Player {
 }
 
 func movePlayer(id, dir string) {
-
+	
+	mu.Lock()
 	for i, p := range gamePlayers {
 		if p.ID == id {
 			newX, newY := p.X, p.Y
@@ -418,16 +418,16 @@ func movePlayer(id, dir string) {
 			case "right":
 				newX++
 			}
-			print("asd befpre send")
 			if newY >= 0 && newY < currentGrid.Rows &&
-				newX >= 0 && newX < currentGrid.Cols {
-
+			newX >= 0 && newX < currentGrid.Cols {
+				
 				cellType := currentGrid.Cells[newY][newX].Type
 				if cellType == "sand" || cellType == "start-zone" {
 					gamePlayers[i].X = newX
 					gamePlayers[i].Y = newY
 				}
 			}
+			mu.Unlock()
 			broadcast(map[string]interface{}{
 				"type": "player_moved",
 				"id":   p.ID,
