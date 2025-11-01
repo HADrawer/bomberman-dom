@@ -94,6 +94,6 @@ button {
 
 /* / ▶️ Facing right */ 
 .player.right {
-  background-image: url("/static/css/sprites/character1-left.png");
+  background-image: url("/static/css/sprites/character1-leright.png");
 }
 
