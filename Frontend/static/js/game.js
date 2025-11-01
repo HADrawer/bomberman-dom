@@ -103,16 +103,17 @@ socket.onmessage = (event) => {
       break;
     }
 
- case "player_joined": {
-  const p = msg.player;
-  if (!document.getElementById(p.id)) {
-    const playerEl = document.createElement("div");
+case "player_moved": {
+  const { id, x, y, direction } = msg;
+  if (id === localPlayer.id) return;
 
-    // 🧭 Default direction when a new player joins
-    playerEl.className = "player down";
-    playerEl.id = p.id;
+  const playerEl = document.getElementById(id);
+  if (playerEl) {
+    // Update direction sprite class
+    playerEl.classList.remove("up", "down", "left", "right");
+    if (direction) playerEl.classList.add(direction);
 
-    placePlayerInCell(playerEl, p.y, p.x);
+    placePlayerInCell(playerEl, y, x);
   }
   break;
 }

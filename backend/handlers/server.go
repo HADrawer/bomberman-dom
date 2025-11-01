@@ -434,6 +434,7 @@ func movePlayer(id, dir string) {
 				"x":    gamePlayers[i].X,
 				"y":    gamePlayers[i].Y,
 				"name": p.Name,
+				"direction": dir, 
 			})
 			break
 		}
