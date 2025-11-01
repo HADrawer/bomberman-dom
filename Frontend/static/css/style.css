@@ -71,11 +71,29 @@ button {
 }
 .player {
   width: 32px;
-  height: 32px; /* fix typo */
-  background-image: url("/static/css/sprites/character1-front.png");
+  height: 32px;
   background-size: cover;
   z-index: 5;
   position: relative; /* required for being inside cells */
 }
 
+/* / 🔽 Facing down (default) / */
+.player.down {
+  background-image: url("/static/css/sprites/character1-front.png");
+}
+
+/* / 🔼 Facing up / */
+.player.up {
+  background-image: url("/static/css/sprites/character1-back.png");
+}
+
+/* / ◀️ Facing left / */
+.player.left {
+  background-image: url("/static/css/sprites/character1-left.png");
+}
+
+/* / ▶️ Facing right */ 
+.player.right {
+  background-image: url("/static/css/sprites/character1-left.png");
+}
 

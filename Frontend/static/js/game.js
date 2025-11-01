@@ -33,19 +33,23 @@ export function startGame(serverGrid, players) {
   });
 
   // 2. Draw all players
+// 2. Draw all players
 players.forEach(p => {
   const playerEl = document.createElement("div");
-  playerEl.className = "player";
+
+  // 🧭 Default direction when spawning
+  playerEl.className = "player down";
   playerEl.id = p.id;
+
   placePlayerInCell(playerEl, p.y, p.x);
-  
-  // const myPlayer = players.find(p => p.name === localStorage.getItem("playerName"));
-  if(!localPlayer.id && p.name === localStorage.getItem("playerName")){
+
+  if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
     localPlayer.id = p.id;
     localPlayer.x = p.x;
     localPlayer.y = p.y;
   }
 });
+
 
 // if (myPlayer) {
   gameArea.addEventListener("click", () => gameArea.focus());
@@ -99,20 +103,21 @@ socket.onmessage = (event) => {
       break;
     }
 
-    case "player_moved": {
-       console.log("Received move:", msg);
-      const playerEl = document.getElementById(msg.id);
-      if (playerEl)
-        { 
-          placePlayerInCell(playerEl,msg.y,msg.x);
-        }else {
-           const newPlayer = document.createElement("div");
-        newPlayer.className = "player";
-        newPlayer.id = msg.id;
-        placePlayerInCell(newPlayer, msg.y, msg.x);
-        }
-          break;
-    }
+ case "player_joined": {
+  const p = msg.player;
+  if (!document.getElementById(p.id)) {
+    const playerEl = document.createElement("div");
+
+    // 🧭 Default direction when a new player joins
+    playerEl.className = "player down";
+    playerEl.id = p.id;
+
+    placePlayerInCell(playerEl, p.y, p.x);
+  }
+  break;
+}
+
+
 
     case "player_left": {
       const playerEl = document.getElementById(msg.id);
@@ -129,27 +134,35 @@ function movePlayerLocally(direction) {
   let newX = localPlayer.x;
   let newY = localPlayer.y;
 
-    switch (direction) {
+  switch (direction) {
     case "up": newY--; break;
     case "down": newY++; break;
     case "left": newX--; break;
     case "right": newX++; break;
   }
-   if (!grid || !grid.cells[newY] || typeof newX !== "number" || typeof newY !== "number") {
+
+  if (!grid || !grid.cells[newY] || typeof newX !== "number" || typeof newY !== "number") {
     console.warn("[Game] Invalid move coordinates:", newX, newY);
     return;
   }
   if (newX < 0 || newX >= grid.cols || newY < 0 || newY >= grid.rows) return;
 
-const targetCell = grid.cells[newY][newX];
+  const targetCell = grid.cells[newY][newX];
   if (targetCell.type !== "sand" && targetCell.type !== "start-zone") return;
 
   const playerEl = document.getElementById(localPlayer.id);
+
+  // 🧭 Update sprite direction before moving
+  playerEl.classList.remove("up", "down", "left", "right");
+  playerEl.classList.add(direction);
+
+  // Move the player visually
   placePlayerInCell(playerEl, newY, newX);
 
+  // Update local position
   localPlayer.x = newX;
   localPlayer.y = newY;
 
+  // Notify the server
   socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction }));
-
 }
