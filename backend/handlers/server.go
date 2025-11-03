@@ -24,8 +24,13 @@ var upgrader = websocket.Upgrader{
 		return true // Allow all connections
 	},
 }
+type ClientData struct {
+    Name string
+    Skin string
+}
+
 var (
-	clients        = make(map[*websocket.Conn]string)
+	clients = make(map[*websocket.Conn]ClientData)
 	mu             sync.Mutex
 	timerRunning   = false
 	timeLeft       = 10
@@ -81,14 +86,15 @@ func startTimer() {
 						"players": gamePlayers,
 					})
 					mu.Lock()
-					for conn, username := range clients {
-						for _, p := range gamePlayers {
-							if p.Name == username {
-								connToPlayerID[conn] = p.ID
-								break
-							}
-						}
-					}
+					for conn, clientData := range clients {
+    for _, p := range gamePlayers {
+        if p.Name == clientData.Name {
+            connToPlayerID[conn] = p.ID
+            break
+        }
+    }
+}
+
 					mu.Unlock()
 
 					timerRunning = false
@@ -109,8 +115,8 @@ func sendPlayerList(conn *websocket.Conn) {
 	defer mu.Unlock()
 
 	players := make([]string, 0, len(clients))
-	for _, username := range clients {
-		players = append(players, username)
+	for _, clientData  := range clients {
+		players = append(players, clientData.Name)
 	}
 
 	playerListMsg := map[string]interface{}{
@@ -206,28 +212,29 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Message type: %s", msgType.Type)
 
 		switch msgType.Type {
-		case "set_name":
-			var msg map[string]interface{}
-			if err := json.Unmarshal(message, &msg); err != nil {
-				log.Printf("Error parsing set_name message: %v", err)
-				continue
-			}
+	case "set_name":
+    var msg map[string]interface{}
+    if err := json.Unmarshal(message, &msg); err != nil {
+        log.Printf("Error parsing set_name message: %v", err)
+        continue
+    }
 
-			// Extract the name field
-			name, ok := msg["name"].(string)
-			if !ok || name == "" {
-				log.Printf("Invalid or empty name received")
-				continue
-			}
+    name, _ := msg["name"].(string)
+    skin, _ := msg["skin"].(string)
 
-			currentUserID = name
-			log.Printf("User set name: %s. Total clients: %d, ", currentUserID, len(clients))
-			log.Printf("Current clients: %v", clients)
+    if name == "" {
+        log.Printf("Invalid or empty name received")
+        continue
+    }
 
-			// Add client to map
-			mu.Lock()
-			clients[conn] = currentUserID
-			mu.Unlock()
+    currentUserID = name
+
+    mu.Lock()
+    clients[conn] = ClientData{Name: name, Skin: skin}
+    mu.Unlock()
+
+    log.Printf("User set name: %s with skin: %s", name, skin)
+
 
 			// Send welcome message to the new user
 			welcomeMsg := map[string]interface{}{
@@ -241,9 +248,11 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			// Broadcast to ALL other clients that a new user joined
 			userJoinedMsg := map[string]interface{}{
-				"type": "user_joined",
-				"name": currentUserID,
-			}
+						"type": "user_joined",
+						"name": currentUserID,
+						"skin": skin,
+					}
+
 			userJoinedBytes, _ := json.Marshal(userJoinedMsg)
 
 			// systemMsg := map[string]interface{}{
@@ -253,10 +262,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// systemBytes, _ := json.Marshal(systemMsg)
 			updateTimerBaseOnPlayers()
 			mu.Lock()
-			for client, username := range clients {
-				// Don't send the join notification to the user who just joined
-				if username != currentUserID {
-					log.Printf("Notifying %s about new user %s", username, currentUserID)
+for client, clientData := range clients {				// Don't send the join notification to the user who just joined
+				if clientData.Name != currentUserID {
+log.Printf("Notifying %s about new user %s", clientData.Name, currentUserID)
 					client.WriteMessage(websocket.TextMessage, userJoinedBytes)
 					// client.WriteMessage(websocket.TextMessage, systemBytes)
 				}
@@ -277,8 +285,8 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Message from %s: %s", currentUserID, myMessage.Text)
 
 			for client := range clients {
-				if currentUserID == clients[client] {
-					continue // Skip sender
+if currentUserID == clients[client].Name {
+						continue // Skip sender
 				}
 				var sendMessage MyMessage
 				sendMessage.Type = "message"
@@ -386,7 +394,7 @@ var spawnPoints = [][2]int{
 func assignPlayers() []Player {
 	players := []Player{}
 	i := 0
-	for _, username := range clients {
+for _, clientData := range clients {
 		if i >= len(spawnPoints) {
 			break // max 4 players
 		}
@@ -395,7 +403,8 @@ func assignPlayers() []Player {
 			ID:   fmt.Sprintf("p%d", i+1),
 			X:    spawn[1],
 			Y:    spawn[0],
-			Name: username,
+Name: clientData.Name,
+        Skin: clientData.Skin,
 		})
 		i++
 	}

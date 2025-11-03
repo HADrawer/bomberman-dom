@@ -214,4 +214,5 @@ type Player struct {
     X    int    `json:"x"`
     Y    int    `json:"y"`
     Name string `json:"name"`
+	Skin string `json:"skin"`
 }

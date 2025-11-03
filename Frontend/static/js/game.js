@@ -34,11 +34,30 @@ export function startGame(serverGrid, players) {
 
   // 2. Draw all players
 // 2. Draw all players
+// players.forEach(p => {
+//   const playerEl = document.createElement("div");
+
+//   // 🧭 Default direction when spawning
+//   playerEl.className = "player down";
+//   playerEl.id = p.id;
+
+//   placePlayerInCell(playerEl, p.y, p.x);
+
+//   if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
+//     localPlayer.id = p.id;
+//     localPlayer.x = p.x;
+//     localPlayer.y = p.y;
+//   }
+// });
 players.forEach(p => {
   const playerEl = document.createElement("div");
 
-  // 🧭 Default direction when spawning
-  playerEl.className = "player down";
+  // 🧭 Default direction
+  playerEl.classList.add("player", "down");
+
+  // 🧍 Use player skin from server if available
+  playerEl.dataset.skin = p.skin || localStorage.getItem("playerSkin") || "character1";
+
   playerEl.id = p.id;
 
   placePlayerInCell(playerEl, p.y, p.x);
@@ -92,16 +111,21 @@ socket.onmessage = (event) => {
   const msg = JSON.parse(event.data);
 
   switch (msg.type) {
-    case "player_joined": {
-      const p = msg.player;
-      if (!document.getElementById(p.id)) {
-        const playerEl = document.createElement("div");
-        playerEl.className = "player";
-        playerEl.id = p.id;
-        placePlayerInCell(playerEl, p.y, p.x);
-      }
-      break;
-    }
+   case "player_joined": {
+  const p = msg.player;
+  if (!document.getElementById(p.id)) {
+    const playerEl = document.createElement("div");
+    playerEl.className = "player down"; // default facing
+    playerEl.id = p.id;
+
+    // Assign the skin sent from server (or default)
+    playerEl.dataset.skin = msg.skin || "character1";
+
+    placePlayerInCell(playerEl, p.y, p.x);
+  }
+  break;
+}
+
 
 case "player_moved": {
   const { id, x, y, direction } = msg;
@@ -167,3 +191,4 @@ function movePlayerLocally(direction) {
   // Notify the server
   socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction }));
 }
+

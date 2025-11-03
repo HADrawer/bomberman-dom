@@ -69,31 +69,94 @@ button {
   background-size: cover;
   background-position: center;
 }
-.player {
+/* .player {
   width: 32px;
   height: 32px;
   background-size: cover;
   z-index: 5;
   position: relative; /* required for being inside cells */
-}
+/* } */
 
 /* / 🔽 Facing down (default) / */
-.player.down {
+/* .player.down {
   background-image: url("/static/css/sprites/character1-front.png");
 }
 
 /* / 🔼 Facing up / */
-.player.up {
+/* .player.up {
   background-image: url("/static/css/sprites/character1-back.png");
 }
 
 /* / ◀️ Facing left / */
-.player.left {
+/* .player.left {
   background-image: url("/static/css/sprites/character1-left.png");
 }
 
 /* / ▶️ Facing right */ 
-.player.right {
+/* .player.right {
+  background-image: url("/static/css/sprites/character1-leright.png");
+} */ 
+
+ .player {
+  width: 32px;
+  height: 32px;
+  background-size: cover;
+  z-index: 5;
+  position: relative;
+}
+
+/* === CHARACTER 1 === */
+.player[data-skin="character1"].down {
+  background-image: url("/static/css/sprites/character1-front.png");
+}
+.player[data-skin="character1"].up {
+  background-image: url("/static/css/sprites/character1-back.png");
+}
+.player[data-skin="character1"].left {
+  background-image: url("/static/css/sprites/character1-left.png");
+}
+.player[data-skin="character1"].right {
   background-image: url("/static/css/sprites/character1-leright.png");
 }
 
+/* === CHARACTER 2 === */
+.player[data-skin="character2"].down {
+  background-image: url("/static/css/sprites/character2-front.png");
+}
+.player[data-skin="character2"].up {
+  background-image: url("/static/css/sprites/character2-back.png");
+}
+.player[data-skin="character2"].left {
+  background-image: url("/static/css/sprites/character2-leftside.png");
+}
+.player[data-skin="character2"].right {
+  background-image: url("/static/css/sprites/character2-rightside.png");
+}
+
+/* === CHARACTER 3 === */
+.player[data-skin="character3"].down {
+  background-image: url("/static/css/sprites/character3-front.png");
+}
+.player[data-skin="character3"].up {
+  background-image: url("/static/css/sprites/character3-back.png");
+}
+.player[data-skin="character3"].left {
+  background-image: url("/static/css/sprites/character3-leftside.png");
+}
+.player[data-skin="character3"].right {
+  background-image: url("/static/css/sprites/character3-rightside.png");
+}
+
+/* === CHARACTER 4 === */
+.player[data-skin="character4"].down {
+  background-image: url("/static/css/sprites/character4-front.png");
+}
+.player[data-skin="character4"].up {
+  background-image: url("/static/css/sprites/character4-back.png");
+}
+.player[data-skin="character4"].left {
+  background-image: url("/static/css/sprites/character4-leftside.png");
+}
+.player[data-skin="character4"].right {
+  background-image: url("/static/css/sprites/character4-rightside.png");
+}
