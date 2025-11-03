@@ -4,7 +4,7 @@ import { makeChatApp } from "./components/chatApp.js";
 
 const state = {
   messages: [
-    { author: "System", text: "Welcome to overReact chat!" }
+    { author: "System", text: "Welcome to Bomber Man chat!" }
   ]
 };
 

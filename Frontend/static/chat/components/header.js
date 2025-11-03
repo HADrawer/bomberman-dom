@@ -4,7 +4,7 @@ export function makeHeader() {
   return new VNode("div", {
     attrs: { class: "chat-header" },
     children: [
-      new VNode("h2", { children: ["overReact Chat"] })
+      new VNode("h2", { children: ["Bomber Man Chat"] })
     ]
   });
 }
