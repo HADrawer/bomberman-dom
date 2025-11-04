@@ -9,28 +9,37 @@ export async function showWaitingRoom() {
 
   connectedPlayers.add(playerName);
 
-  app.innerHTML = `
-    <div class="container">
-      <h1>Waiting Room</h1>
-      <p>Welcome <strong>${playerName}</strong> 👋</p>
-      <p>Waiting another players...</p>
-      <p id="timer">⏳ Waiting...</p>
+app.innerHTML = `
+  <div class="waiting-page">
+    
+    <!-- LEFT FRAME: Waiting Room Info -->
+    <div class="waiting-left">
+      <h1 class="waiting-title">Waiting Room</h1>
+      <p class="waiting-welcome">Welcome <strong>${playerName}</strong> 👋</p>
+      <p class="waiting-status">Waiting for other players...</p>
+      <p id="timer" class="waiting-timer">⏳ Waiting...</p>
 
-       <div id="players">
-        <h3>Connected Players:</h3>
-        <div id="player-list">
-           ${Array.from(connectedPlayers).map(player => `
-            <div class="player-item">👤 ${player} ${player === playerName ? '(You)' : ''}</div>
+      <div class="waiting-players">
+        <h3 class="players-title">Connected Players:</h3>
+        <div class="players-list">
+          ${Array.from(connectedPlayers).map(player => `
+            <div class="player-item">
+              👤 ${player} ${player === playerName ? '<span class="you">(You)</span>' : ''}
+            </div>
           `).join('')}
         </div>
       </div>
-      <!-- <div id="debug"></div> -->
-
-    <div id="chat"></div>
-      
-
     </div>
-  `;
+
+    <!-- RIGHT FRAME: Chat Box -->
+    <div class="waiting-right">
+      <h3 class="chat-title"> Chat</h3>
+      <div id="chat" class="chat-box"></div>
+    </div>
+
+  </div>
+`;
+
 
   const timerEl = document.getElementById("timer");
   const startBtn = document.getElementById("startGameBtn");

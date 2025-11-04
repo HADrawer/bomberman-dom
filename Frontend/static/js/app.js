@@ -1,13 +1,29 @@
-
-import { socket } from "../ws.js"; 
+import { socket } from "../ws.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const app = document.getElementById("app");
 
+  // 🌟 Step 1: Lobby Screen
+  function showLobbyScreen() {
+    app.innerHTML = `
+      <div class="container">
+        <h1 class="bomberman">Bomberman</h1>
+        <div id="lobbyStartBtn" class="start-text"><span class="arrow">></span> Start</div>
+      </div>
+    `;
+
+    // Click or Enter to continue
+    document.getElementById("lobbyStartBtn").addEventListener("click", showNameScreen);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") showNameScreen();
+    });
+  }
+
+  // 🧍 Step 2: Name + Skin Selection
   function showNameScreen() {
     app.innerHTML = `
-       <div class="container">
-        <h1>Enter Your Name:</h1>
+      <div class="container">
+        <h1 class="heading-text">Enter Your Name:</h1>
         <input type="text" id="playerName" placeholder="Your name here" />
         <br><br>
 
@@ -20,11 +36,11 @@ document.addEventListener("DOMContentLoaded", () => {
         </select>
         <br><br>
 
-        <button id="startBtn">Join</button>
+        <div id="startBtn" class="start-text"><span class="arrow">></span> Join</div>
       </div>
     `;
 
-    document.getElementById("startBtn").addEventListener("click", () => {
+    function submitName() {
       const name = document.getElementById("playerName").value.trim();
       const skin = document.getElementById("skinSelect").value;
 
@@ -34,19 +50,26 @@ document.addEventListener("DOMContentLoaded", () => {
       localStorage.setItem("playerName", name);
       localStorage.setItem("playerSkin", skin);
 
-      // Tell the server your name
-socket.send(JSON.stringify({ type: "set_name", name, skin }));
+      // Notify backend
+      socket.send(JSON.stringify({ type: "set_name", name, skin }));
 
       // Move to waiting room
       loadWaitingRoom();
+    }
+
+    document.getElementById("startBtn").addEventListener("click", submitName);
+    document.getElementById("playerName").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitName();
     });
   }
 
+  // 🕓 Step 3: Waiting Room
   function loadWaitingRoom() {
-    import("./waiting.js").then(module => {
+    import("./waiting.js").then((module) => {
       module.showWaitingRoom();
     });
   }
 
-  showNameScreen();
+  // Start at Lobby
+  showLobbyScreen();
 });
