@@ -81,7 +81,6 @@ players.forEach(p => {
       case "a": case "arrowleft": dir = "left"; break;
       case "d": case "arrowright": dir = "right"; break;
     }
-
     if (dir) {
      movePlayerLocally(dir);
     }
