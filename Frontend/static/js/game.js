@@ -61,7 +61,7 @@ players.forEach(p => {
   playerEl.id = p.id;
 
   placePlayerInCell(playerEl, p.y, p.x);
-
+  updateHearts(playerEl, p.lives ?? 3);
   if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
     localPlayer.id = p.id;
     localPlayer.x = p.x;
@@ -106,6 +106,40 @@ function placePlayerInCell(playerEl, row, col) {
   
 }
 
+function createHeartsEl(lives) {
+  const container = document.createElement('div');
+  container.className = 'hearts';
+  for (let i = 0; i < 3; i++) {
+      const h = document.createElement('div');
+      h.className = 'heart';
+      h.textContent = '♥';
+      if (i >= lives) h.classList.add('empty');
+      container.appendChild(h);
+    }
+  return container;
+}
+
+function updateHearts(playerEl, lives){
+  if (!playerEl) return;
+  let hearts = playerEl.querySelector('.hearts');
+  if (!hearts){
+    hearts = createHeartsEl(lives);
+    playerEl.appendChild(hearts);
+    return
+  }
+  const heartEls = hearts.children;
+  for (let i = 0; i < 3; i++){
+    if (i < lives) {
+      heartEls[i].classList.remove('emtpy');
+      heartEls[i].textContent = "♥";
+
+    }else {
+      heartEls[i].classList.add('empty');
+      heartEls[i].textContent = '♡';
+    }
+  }
+}
+
 socket.onmessage = (event) => {
   const msg = JSON.parse(event.data);
 
@@ -143,13 +177,30 @@ case "player_moved": {
 
 
 
-    case "player_left": {
+case "player_left": {
       const playerEl = document.getElementById(msg.id);
       if (playerEl) playerEl.remove();
       break;
     }
 
-    default:
+case "player_damaged": {
+  const {id, lives} = msg;
+  const playerEl = document.getElementById(id);
+  if (playerEl) updateHearts(playerEl, lives);
+  break;
+}
+
+case "player_dead": {
+  const { id } = msg; 
+  const playerEl = document.getElementById(id);
+  if(playerEl) {
+    playerEl.style.opacity = '0.4';
+    updateHearts(playerEl, 0);
+  }
+  break;
+}
+
+default:
       console.log("Unknown message:", msg);
   }
 }

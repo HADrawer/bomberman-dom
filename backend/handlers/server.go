@@ -212,28 +212,28 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Message type: %s", msgType.Type)
 
 		switch msgType.Type {
-	case "set_name":
-    var msg map[string]interface{}
-    if err := json.Unmarshal(message, &msg); err != nil {
-        log.Printf("Error parsing set_name message: %v", err)
-        continue
-    }
+		case "set_name":
+			var msg map[string]interface{}
+			if err := json.Unmarshal(message, &msg); err != nil {
+				log.Printf("Error parsing set_name message: %v", err)
+				continue
+			}
 
-    name, _ := msg["name"].(string)
-    skin, _ := msg["skin"].(string)
+			name, _ := msg["name"].(string)
+			skin, _ := msg["skin"].(string)
 
-    if name == "" {
-        log.Printf("Invalid or empty name received")
-        continue
-    }
+			if name == "" {
+				log.Printf("Invalid or empty name received")
+				continue
+			}
 
-    currentUserID = name
+			currentUserID = name
 
-    mu.Lock()
-    clients[conn] = ClientData{Name: name, Skin: skin}
-    mu.Unlock()
+			mu.Lock()
+			clients[conn] = ClientData{Name: name, Skin: skin}
+			mu.Unlock()
 
-    log.Printf("User set name: %s with skin: %s", name, skin)
+			log.Printf("User set name: %s with skin: %s", name, skin)
 
 
 			// Send welcome message to the new user
@@ -262,9 +262,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// systemBytes, _ := json.Marshal(systemMsg)
 			updateTimerBaseOnPlayers()
 			mu.Lock()
-for client, clientData := range clients {				// Don't send the join notification to the user who just joined
+			for client, clientData := range clients {				// Don't send the join notification to the user who just joined
 				if clientData.Name != currentUserID {
-log.Printf("Notifying %s about new user %s", clientData.Name, currentUserID)
+					log.Printf("Notifying %s about new user %s", clientData.Name, currentUserID)
 					client.WriteMessage(websocket.TextMessage, userJoinedBytes)
 					// client.WriteMessage(websocket.TextMessage, systemBytes)
 				}
@@ -285,7 +285,7 @@ log.Printf("Notifying %s about new user %s", clientData.Name, currentUserID)
 			log.Printf("Message from %s: %s", currentUserID, myMessage.Text)
 
 			for client := range clients {
-if currentUserID == clients[client].Name {
+				if currentUserID == clients[client].Name {
 						continue // Skip sender
 				}
 				var sendMessage MyMessage
@@ -317,7 +317,12 @@ if currentUserID == clients[client].Name {
 			// }
 
 			go movePlayer(moveMsg.ID, moveMsg.Direction)
-
+		
+		case "damage":
+			var d struct{ID string `json:"id"`; Amount int `json:"amount"`}
+			if err := json.Unmarshal(message, &d); err == nil {
+				damagePlayer(d.ID, d.Amount)
+			}
 		}
 
 	}
@@ -403,8 +408,9 @@ for _, clientData := range clients {
 			ID:   fmt.Sprintf("p%d", i+1),
 			X:    spawn[1],
 			Y:    spawn[0],
-Name: clientData.Name,
-        Skin: clientData.Skin,
+			Name: clientData.Name,
+        	Skin: clientData.Skin,
+			Lives: 3 ,
 		})
 		i++
 	}
@@ -444,8 +450,39 @@ func movePlayer(id, dir string) {
 				"y":    gamePlayers[i].Y,
 				"name": p.Name,
 				"direction": dir, 
+				"lives": gamePlayers[i].Lives,
 			})
 			break
 		}
 	}
+}
+
+func damagePlayer(id string, amount int) {
+
+	for i , p := range gamePlayers {
+		if p.ID == id {
+			gamePlayers[i].Lives -= amount
+			if gamePlayers[i].Lives < 0 {
+				gamePlayers[i].Lives = 0
+			}
+		}
+		
+		
+		broadcast(map[string]interface{}{
+			"type": "player_damaged",
+			"id": p.ID,
+			"lives": gamePlayers[i].Lives,
+			"name": p.Name,
+		})
+		
+		if gamePlayers[i].Lives == 0 {
+			broadcast(map[string]interface{}{
+				"type": "player_dead",
+				"id": p.ID,
+				"name": p.Name,
+			})
+		}
+		break
+	}
+
 }
