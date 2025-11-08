@@ -86,6 +86,13 @@ players.forEach(p => {
     }
   });
 // }
+// ✅ Add key listener for placing bombs
+document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "x") {
+    placeBomb();
+  }
+});
+
 
 
 
@@ -241,4 +248,55 @@ function movePlayerLocally(direction) {
   // Notify the server
   socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction }));
 }
+function placeBomb() {
+  console.log("💣 Placing bomb at", localPlayer.x, localPlayer.y);
+
+  const cellEl = document.querySelector(
+    `.cell[data-row='${localPlayer.y}'][data-col='${localPlayer.x}']`
+  );
+
+  if (!cellEl) {
+    console.warn("⚠️ Could not find cell to place bomb.");
+    return;
+  }
+
+  // Avoid placing multiple bombs in one cell
+  if (cellEl.querySelector(".bomb")) {
+    console.log("⛔ A bomb is already here.");
+    return;
+  }
+
+  // Create bomb
+  const bombEl = document.createElement("div");
+  bombEl.classList.add("bomb");
+
+  // Append to current cell
+  cellEl.appendChild(bombEl);
+
+  // Simulate fuse countdown (3 seconds)
+  setTimeout(() => {
+    explodeBomb(bombEl, localPlayer.x, localPlayer.y);
+  }, 3000);
+}
+
+// 💥 Simulate explosion (remove bomb + show animation)
+function explodeBomb(bombEl, x, y) {
+  const cellEl = document.querySelector(
+    `.cell[data-row='${y}'][data-col='${x}']`
+  );
+
+  if (!cellEl) return;
+
+  // Remove the bomb
+  bombEl.remove();
+
+  // Create explosion effect
+  const explosionEl = document.createElement("div");
+  explosionEl.classList.add("explosion");
+  cellEl.appendChild(explosionEl);
+
+  // Remove explosion after animation
+  setTimeout(() => explosionEl.remove(), 500);
+}
+
 
