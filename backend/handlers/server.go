@@ -33,7 +33,7 @@ var (
 	clients = make(map[*websocket.Conn]ClientData)
 	mu             sync.Mutex
 	timerRunning   = false
-	timeLeft       = 10
+	timeLeft       = 60
 	stopTimer      = make(chan bool)
 	connToPlayerID = make(map[*websocket.Conn]string)
 )
@@ -63,7 +63,7 @@ func startTimer() {
 	timerRunning = true
 
 	go func() {
-		timeLeft = 10
+		timeLeft = 60
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -103,7 +103,7 @@ func startTimer() {
 			case <-stopTimer:
 				log.Println("Timer stopped (not enough players).")
 				timerRunning = false
-				timeLeft = 10
+				timeLeft = 60
 				return
 			}
 		}

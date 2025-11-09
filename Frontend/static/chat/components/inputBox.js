@@ -4,7 +4,11 @@ import { socket } from "../../ws.js";
 
 export function makeInputBox(app) {
   const input = new VNode("input", {
-    attrs: { id: "chat-input", placeholder: "Type a message...", class: "chat-input" }
+    attrs: { 
+      id: "chat-input", 
+      placeholder: "Type a message...", 
+      class: "chat-input" 
+    }
   }, app);
 
   const button = new VNode("button", {
@@ -12,20 +16,40 @@ export function makeInputBox(app) {
     children: ["Send"]
   }, app);
 
-  button.listenEvent("onclick", () => {
+  // ✅ Unified message send function
+  function sendMessage() {
     const inputEl = document.getElementById("chat-input");
+    if (!inputEl) return;
     const value = inputEl.value.trim();
     if (!value) return;
-    socket.send((JSON.stringify({ type: "message", text: value })));
+
+    socket.send(JSON.stringify({ type: "message", text: value }));
     app.state.messages.push({ author: "Me", text: value });
     inputEl.value = "";
 
     // 🔑 Trigger UI re-render
     app.vApp = makeChatApp(app);
     app.update();
+
+    // ✅ Keep focus so user can type continuously
+    inputEl.focus();
+  }
+
+  // 🧠 Listen for Enter key press
+  input.listenEvent("onkeydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault(); // Stop browser refresh
+      sendMessage();
+    }
   });
 
-if (!app._socketListening) {
+  // 🖱️ Send button click
+  button.listenEvent("onclick", () => {
+    sendMessage();
+  });
+
+  // 🧩 One-time WebSocket listener
+  if (!app._socketListening) {
     socket.addEventListener("message", (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -44,10 +68,6 @@ if (!app._socketListening) {
     app._socketListening = true;
   }
 
-
-
-
-  
   return new VNode("div", {
     attrs: { class: "chat-input-box" },
     children: [input, button]

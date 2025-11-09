@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Click or Enter to continue
     document.getElementById("lobbyStartBtn").addEventListener("click", showNameScreen);
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") showNameScreen();
+     // if (e.key === "Enter") showNameScreen();
     });
   }
 
