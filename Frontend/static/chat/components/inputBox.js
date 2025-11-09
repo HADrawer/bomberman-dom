@@ -38,33 +38,36 @@ export function makeInputBox(app) {
   // 🧠 Listen for Enter key press
   input.listenEvent("onkeydown", (e) => {
     if (e.key === "Enter") {
-      e.preventDefault(); // Stop browser refresh
+      e.preventDefault();
       sendMessage();
     }
   });
 
   // 🖱️ Send button click
-  button.listenEvent("onclick", () => {
-    sendMessage();
-  });
+  button.listenEvent("onclick", sendMessage);
 
   // 🧩 One-time WebSocket listener
   if (!app._socketListening) {
-    socket.addEventListener("message", (event) => {
+    // Define listener as a named function so it can be removed later
+    const onMessage = (event) => {
       try {
         const data = JSON.parse(event.data);
 
         if (data.type === "message" && data.from && data.text) {
           app.state.messages.push({ author: data.from, text: data.text });
-
           app.vApp = makeChatApp(app);
           app.update();
+        } else if (data.type === "start_game") {
+          // ✅ Correct removal
+          socket.removeEventListener("message", onMessage);
+          console.log("🧹 Message listener removed after start_game");
         }
       } catch (err) {
         console.error("Invalid message from server:", err);
       }
-    });
+    };
 
+    socket.addEventListener("message", onMessage);
     app._socketListening = true;
   }
 
