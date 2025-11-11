@@ -4,17 +4,27 @@ export let localPlayer = { id: null, x: 0, y: 0 };
 let grid = null;
 
 export function startGame(serverGrid, players) {
-    grid = serverGrid;
+  grid = serverGrid;
 
   const app = document.getElementById("app");
   app.innerHTML = `
-    <div class="container">
-      <h1>Game Started</h1>
+  <div class="game-page">
+
+    <!-- LEFT = GAME -->
+    <div class="game-left">
+      <p style="text-align:center; margin-top:5px;">Use WASD or Arrow Keys • Press X to place bomb</p>
       <div id="gameArea" class="grid" tabindex="0"></div>
     </div>
-    <p>Click on the grid and use WASD / Arrow keys to move.</p>
-    <div id="chat"></div>
-  `;
+
+    <!-- RIGHT = CHAT -->
+    <div class="game-right">
+      <h3 class="game-chat-title">Chat</h3>
+      <div id="chat"></div>
+    </div>
+
+  </div>
+`;
+
 
   const gameArea = document.getElementById("gameArea");
 
@@ -33,44 +43,44 @@ export function startGame(serverGrid, players) {
   });
 
   // 2. Draw all players
-// 2. Draw all players
-// players.forEach(p => {
-//   const playerEl = document.createElement("div");
+  // 2. Draw all players
+  // players.forEach(p => {
+  //   const playerEl = document.createElement("div");
 
-//   // 🧭 Default direction when spawning
-//   playerEl.className = "player down";
-//   playerEl.id = p.id;
+  //   // 🧭 Default direction when spawning
+  //   playerEl.className = "player down";
+  //   playerEl.id = p.id;
 
-//   placePlayerInCell(playerEl, p.y, p.x);
+  //   placePlayerInCell(playerEl, p.y, p.x);
 
-//   if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
-//     localPlayer.id = p.id;
-//     localPlayer.x = p.x;
-//     localPlayer.y = p.y;
-//   }
-// });
-players.forEach(p => {
-  const playerEl = document.createElement("div");
+  //   if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
+  //     localPlayer.id = p.id;
+  //     localPlayer.x = p.x;
+  //     localPlayer.y = p.y;
+  //   }
+  // });
+  players.forEach(p => {
+    const playerEl = document.createElement("div");
 
-  // 🧭 Default direction
-  playerEl.classList.add("player", "down");
+    // 🧭 Default direction
+    playerEl.classList.add("player", "down");
 
-  // 🧍 Use player skin from server if available
-  playerEl.dataset.skin = p.skin || localStorage.getItem("playerSkin") || "character1";
+    // 🧍 Use player skin from server if available
+    playerEl.dataset.skin = p.skin || localStorage.getItem("playerSkin") || "character1";
 
-  playerEl.id = p.id;
+    playerEl.id = p.id;
 
-  placePlayerInCell(playerEl, p.y, p.x);
-  updateHearts(playerEl, p.lives ?? 3);
-  if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
-    localPlayer.id = p.id;
-    localPlayer.x = p.x;
-    localPlayer.y = p.y;
-  }
-});
+    placePlayerInCell(playerEl, p.y, p.x);
+    updateHearts(playerEl, p.lives ?? 3);
+    if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
+      localPlayer.id = p.id;
+      localPlayer.x = p.x;
+      localPlayer.y = p.y;
+    }
+  });
 
 
-// if (myPlayer) {
+  // if (myPlayer) {
   gameArea.addEventListener("click", () => gameArea.focus());
 
   document.addEventListener("keydown", (e) => {
@@ -82,16 +92,16 @@ players.forEach(p => {
       case "d": case "arrowright": dir = "right"; break;
     }
     if (dir) {
-     movePlayerLocally(dir);
+      movePlayerLocally(dir);
     }
   });
-// }
-// ✅ Add key listener for placing bombs
-document.addEventListener("keydown", (e) => {
-  if (e.key.toLowerCase() === "x") {
-    placeBomb();
-  }
-});
+  // }
+  // ✅ Add key listener for placing bombs
+  document.addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "x") {
+      placeBomb();
+    }
+  });
 
 
 
@@ -99,7 +109,7 @@ document.addEventListener("keydown", (e) => {
 
   // Load chat
   import("../chat/app.js").then(chat => {
-    chat.buildApp(); 
+    chat.buildApp();
   });
 }
 
@@ -107,40 +117,40 @@ document.addEventListener("keydown", (e) => {
 function placePlayerInCell(playerEl, row, col) {
   const cellEl = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
   if (!cellEl) return;
-    // Remove from previous parent if any
-    if (playerEl.parentElement) playerEl.parentElement.removeChild(playerEl);
-    cellEl.appendChild(playerEl);
-  
+  // Remove from previous parent if any
+  if (playerEl.parentElement) playerEl.parentElement.removeChild(playerEl);
+  cellEl.appendChild(playerEl);
+
 }
 
 function createHeartsEl(lives) {
   const container = document.createElement('div');
   container.className = 'hearts';
   for (let i = 0; i < 3; i++) {
-      const h = document.createElement('div');
-      h.className = 'heart';
-      h.textContent = '♥';
-      if (i >= lives) h.classList.add('empty');
-      container.appendChild(h);
-    }
+    const h = document.createElement('div');
+    h.className = 'heart';
+    h.textContent = '♥';
+    if (i >= lives) h.classList.add('empty');
+    container.appendChild(h);
+  }
   return container;
 }
 
-function updateHearts(playerEl, lives){
+function updateHearts(playerEl, lives) {
   if (!playerEl) return;
   let hearts = playerEl.querySelector('.hearts');
-  if (!hearts){
+  if (!hearts) {
     hearts = createHeartsEl(lives);
     playerEl.appendChild(hearts);
     return
   }
   const heartEls = hearts.children;
-  for (let i = 0; i < 3; i++){
+  for (let i = 0; i < 3; i++) {
     if (i < lives) {
       heartEls[i].classList.remove('emtpy');
       heartEls[i].textContent = "♥";
 
-    }else {
+    } else {
       heartEls[i].classList.add('empty');
       heartEls[i].textContent = '♡';
     }
@@ -151,63 +161,63 @@ socket.onmessage = (event) => {
   const msg = JSON.parse(event.data);
 
   switch (msg.type) {
-   case "player_joined": {
-  const p = msg.player;
-  if (!document.getElementById(p.id)) {
-    const playerEl = document.createElement("div");
-    playerEl.className = "player down"; // default facing
-    playerEl.id = p.id;
+    case "player_joined": {
+      const p = msg.player;
+      if (!document.getElementById(p.id)) {
+        const playerEl = document.createElement("div");
+        playerEl.className = "player down"; // default facing
+        playerEl.id = p.id;
 
-    // Assign the skin sent from server (or default)
-    playerEl.dataset.skin = msg.skin || "character1";
+        // Assign the skin sent from server (or default)
+        playerEl.dataset.skin = msg.skin || "character1";
 
-    placePlayerInCell(playerEl, p.y, p.x);
-  }
-  break;
-}
-
-
-case "player_moved": {
-  const { id, x, y, direction } = msg;
-  if (id === localPlayer.id) return;
-
-  const playerEl = document.getElementById(id);
-  if (playerEl) {
-    // Update direction sprite class
-    playerEl.classList.remove("up", "down", "left", "right");
-    if (direction) playerEl.classList.add(direction);
-
-    placePlayerInCell(playerEl, y, x);
-  }
-  break;
-}
+        placePlayerInCell(playerEl, p.y, p.x);
+      }
+      break;
+    }
 
 
+    case "player_moved": {
+      const { id, x, y, direction } = msg;
+      if (id === localPlayer.id) return;
 
-case "player_left": {
+      const playerEl = document.getElementById(id);
+      if (playerEl) {
+        // Update direction sprite class
+        playerEl.classList.remove("up", "down", "left", "right");
+        if (direction) playerEl.classList.add(direction);
+
+        placePlayerInCell(playerEl, y, x);
+      }
+      break;
+    }
+
+
+
+    case "player_left": {
       const playerEl = document.getElementById(msg.id);
       if (playerEl) playerEl.remove();
       break;
     }
 
-case "player_damaged": {
-  const {id, lives} = msg;
-  const playerEl = document.getElementById(id);
-  if (playerEl) updateHearts(playerEl, lives);
-  break;
-}
+    case "player_damaged": {
+      const { id, lives } = msg;
+      const playerEl = document.getElementById(id);
+      if (playerEl) updateHearts(playerEl, lives);
+      break;
+    }
 
-case "player_dead": {
-  const { id } = msg; 
-  const playerEl = document.getElementById(id);
-  if(playerEl) {
-    playerEl.style.opacity = '0.4';
-    updateHearts(playerEl, 0);
-  }
-  break;
-}
+    case "player_dead": {
+      const { id } = msg;
+      const playerEl = document.getElementById(id);
+      if (playerEl) {
+        playerEl.style.opacity = '0.4';
+        updateHearts(playerEl, 0);
+      }
+      break;
+    }
 
-default:
+    default:
       console.log("Unknown message:", msg);
   }
 }
