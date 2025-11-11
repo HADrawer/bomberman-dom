@@ -594,5 +594,50 @@ button:hover {
 
 
 
+/* /////////////////////////// */
+.character-select {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.char-box {
+  width: 70px;
+  height: 70px;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #1e1e3f;
+  border: 3px solid #ffffff50;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.char-box:hover {
+  transform: scale(1.15);
+  border-color: #fff;
+}
+
+.char-box.selected {
+  border-color: #00ff9d;
+  box-shadow: 0 0 10px #00ff9d;
+}
+
+/* Character images */
+.char-box[data-skin="character1"] {
+  background-image: url("/static/css/sprites/character1-front.png");
+}
+.char-box[data-skin="character2"] {
+  background-image: url("/static/css/sprites/character2-front.png");
+}
+.char-box[data-skin="character3"] {
+  background-image: url("/static/css/sprites/character3-front.png");
+}
+.char-box[data-skin="character4"] {
+  background-image: url("/static/css/sprites/character4-front.png");
+}
 
 
