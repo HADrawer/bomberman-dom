@@ -12,7 +12,7 @@ body {
   justify-content: center;
   align-items: center;
   height: 100vh;
-    overflow: hidden;
+  overflow: hidden;
   margin: 0;
   padding: 0%;
   background-color: #0e0e0e;
@@ -31,18 +31,23 @@ body {
 /* Main page wrapper */
 .waiting-page {
   display: flex;
-  justify-content: center;   /* center both boxes together */
+  justify-content: center;
+  /* center both boxes together */
   align-items: stretch;
-  gap: 20px;                 /* space between boxes */
-  margin: 2% auto;           /* small margin around */
+  gap: 20px;
+  /* space between boxes */
+  margin: 2% auto;
+  /* small margin around */
   height: 90vh;
-  max-width: 1200px;         /* fixed total width */
+  max-width: 1200px;
+  /* fixed total width */
   box-sizing: border-box;
 }
 
 /* Left frame (Waiting Room info) */
 .waiting-left {
-  width: 700px;              /* fixed width for left box */
+  width: 700px;
+  /* fixed width for left box */
   background: rgba(20, 0, 40, 0.9);
   border: 4px solid #ffd700;
   box-shadow: 0 0 0 4px #000, 0 0 15px 4px rgba(255, 215, 0, 0.4);
@@ -55,7 +60,8 @@ body {
 
 /* Right frame (Chat box) */
 .waiting-right {
-  width: 450px;              /* smaller, fixed width for chat box */
+  width: 450px;
+  /* smaller, fixed width for chat box */
   background: rgba(20, 0, 40, 0.9);
   border: 4px solid #ffd700;
   box-shadow: 0 0 0 4px #000, 0 0 15px 4px rgba(255, 215, 0, 0.4);
@@ -117,7 +123,7 @@ body {
 /* Chat box area */
 .chat-box {
   flex-grow: 1;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(236, 226, 226, 0.9);
   border: 2px solid #ffd700;
   box-shadow: 0 0 0 2px #000;
   padding: 10px;
@@ -256,10 +262,12 @@ button:hover {
 ::-webkit-scrollbar {
   width: 10px;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #ffd700;
   border: 2px solid #000;
 }
+
 ::-webkit-scrollbar-track {
   background: #222;
 }
@@ -294,15 +302,19 @@ button:hover {
 .cell.sand {
   background-image: url("/static/css/sprites/sand.png");
 }
+
 .cell.stone {
   background-image: url("/static/css/sprites/stone.png");
 }
+
 .cell.wall {
   background-image: url("/static/css/sprites/trees.png");
 }
+
 .cell.inner-wall {
   background-image: url("/static/css/sprites/piller.png");
 }
+
 .cell.start-zone {
   background-image: url("/static/css/sprites/start-zone-grass.png");
   background-size: cover;
@@ -322,12 +334,15 @@ button:hover {
 .player[data-skin="character1"].down {
   background-image: url("/static/css/sprites/character1-front.png");
 }
+
 .player[data-skin="character1"].up {
   background-image: url("/static/css/sprites/character1-back.png");
 }
+
 .player[data-skin="character1"].left {
   background-image: url("/static/css/sprites/character1-left.png");
 }
+
 .player[data-skin="character1"].right {
   background-image: url("/static/css/sprites/character1-leright.png");
 }
@@ -336,12 +351,15 @@ button:hover {
 .player[data-skin="character2"].down {
   background-image: url("/static/css/sprites/character2-front.png");
 }
+
 .player[data-skin="character2"].up {
   background-image: url("/static/css/sprites/character2-back.png");
 }
+
 .player[data-skin="character2"].left {
   background-image: url("/static/css/sprites/character2-leftside.png");
 }
+
 .player[data-skin="character2"].right {
   background-image: url("/static/css/sprites/character2-rightside.png");
 }
@@ -350,12 +368,15 @@ button:hover {
 .player[data-skin="character3"].down {
   background-image: url("/static/css/sprites/character3-front.png");
 }
+
 .player[data-skin="character3"].up {
   background-image: url("/static/css/sprites/character3-back.png");
 }
+
 .player[data-skin="character3"].left {
   background-image: url("/static/css/sprites/character3-leftside.png");
 }
+
 .player[data-skin="character3"].right {
   background-image: url("/static/css/sprites/character3-rightside.png");
 }
@@ -364,12 +385,15 @@ button:hover {
 .player[data-skin="character4"].down {
   background-image: url("/static/css/sprites/character4-front.png");
 }
+
 .player[data-skin="character4"].up {
   background-image: url("/static/css/sprites/character4-back.png");
 }
+
 .player[data-skin="character4"].left {
   background-image: url("/static/css/sprites/character4-leftside.png");
 }
+
 .player[data-skin="character4"].right {
   background-image: url("/static/css/sprites/character4-rightside.png");
 }
@@ -387,7 +411,8 @@ button:hover {
 /* hearts container */
 .player .hearts {
   position: absolute;
-  top: -18px; /* فوق الرأس */
+  top: -18px;
+  /* فوق الرأس */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -405,14 +430,17 @@ button:hover {
   font-size: 12px;
   color: red;
 }
+
 .player .heart.empty {
   color: #444;
   opacity: 0.4;
 }
+
 .bomb {
   width: 32px;
   height: 32px;
-  background-image: url("../assets/bombs.gif"); /* adjust path */
+  background-image: url("../assets/bombs.gif");
+  /* adjust path */
   background-size: cover;
   background-repeat: no-repeat;
   margin: auto;
@@ -435,6 +463,7 @@ button:hover {
     transform: scale(0.5);
     opacity: 1;
   }
+
   100% {
     transform: scale(2);
     opacity: 0;
@@ -451,7 +480,7 @@ button:hover {
   justify-content: center;
   align-items: stretch;
   gap: 20px;
-  margin: 1em ;
+  margin: 1em;
   height: 90vh;
   max-width: 1200px;
   box-sizing: border-box;
@@ -493,7 +522,7 @@ button:hover {
 
 .game-right #chat {
   flex-grow: 1;
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.05);
   border: 2px solid #ffd700;
   box-shadow: 0 0 0 2px #000;
   padding: 10px;
@@ -503,9 +532,67 @@ button:hover {
 }
 
 #gameArea {
-  transform: scale(0.95);     /* make smaller (0.7, 0.6 etc if needed) */
-  transform-origin: top center;  
+  transform: scale(0.95);
+  /* make smaller (0.7, 0.6 etc if needed) */
+  transform-origin: top center;
   margin: 0 auto;
 }
+
+
+/* 📟 RETRO SCROLLBAR FOR CHAT */
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 90%;
+  width: 100%;
+  
+}
+
+
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  border: 2px solid #ffffffb7;
+}
+
+
+
+.chat-message {
+  margin: 5px 0;
+  padding: 0.3em;
+  background-color: rgba(20, 0, 60, 0.8);
+  /* dark purple-blue, semi-transparent */
+  border-left: 5px solid #ffd700;
+  /* gold line on the left */
+  border-radius: 5px;
+  position: relative;
+  word-wrap: break-word;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+  /* subtle gold glow */
+  color: #fffacd;
+  /* soft yellow text for readability */
+}
+
+.chat-input-box {
+  display: flex;
+  padding: 10px;
+
+}
+
+.chat-input {
+  flex: 1;
+  padding: 5px;
+}
+
+.chat-send {
+  margin-left: 5px;
+  padding: 5px 10px;
+}
+
+
+
 
 

@@ -33,7 +33,8 @@ app.innerHTML = `
 
     <!-- RIGHT FRAME: Chat Box -->
     <div class="waiting-right">
-      <h3 class="chat-title"> Chat</h3>
+      <h3 class="chat-title"> Bomber Man Chat
+</h3>
       <div id="chat" class="chat-box"></div>
     </div>
 
