@@ -86,10 +86,10 @@ export function startGame(serverGrid, players) {
   document.addEventListener("keydown", (e) => {
     let dir = null;
     switch (e.key.toLowerCase()) {
-      case "w": case "arrowup": dir = "up"; break;
-      case "s": case "arrowdown": dir = "down"; break;
-      case "a": case "arrowleft": dir = "left"; break;
-      case "d": case "arrowright": dir = "right"; break;
+      case "arrowup": dir = "up"; break;
+      case "arrowdown": dir = "down"; break;
+      case "arrowleft": dir = "left"; break;
+      case "arrowright": dir = "right"; break;
     }
     if (dir) {
       movePlayerLocally(dir);
