@@ -36,6 +36,7 @@ var (
 	timeLeft       = 60
 	stopTimer      = make(chan bool)
 	connToPlayerID = make(map[*websocket.Conn]string)
+	bombs		   = make(map[string]Bomb)
 )
 
 func broadcast(msg interface{}) {
@@ -63,7 +64,7 @@ func startTimer() {
 	timerRunning = true
 
 	go func() {
-		timeLeft = 60
+		timeLeft = 10
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -323,6 +324,17 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			if err := json.Unmarshal(message, &d); err == nil {
 				damagePlayer(d.ID, d.Amount)
 			}
+
+		case "plant_bomb":
+			var bombMsg struct {
+				ID string `json:"id"`
+			}
+			if err := json.Unmarshal(message, &bombMsg); err != nil {
+				log.Println("Error parsing Plant_bomb:", err)
+				continue
+			}
+			playerID := connToPlayerID[conn]
+			plant_bomb(playerID)
 		}
 
 	}
@@ -411,6 +423,8 @@ for _, clientData := range clients {
 			Name: clientData.Name,
         	Skin: clientData.Skin,
 			Lives: 3 ,
+			BombRange: 1,
+			BombCount: 1,
 		})
 		i++
 	}
@@ -465,24 +479,184 @@ func damagePlayer(id string, amount int) {
 			if gamePlayers[i].Lives < 0 {
 				gamePlayers[i].Lives = 0
 			}
-		}
-		
-		
-		broadcast(map[string]interface{}{
-			"type": "player_damaged",
-			"id": p.ID,
-			"lives": gamePlayers[i].Lives,
-			"name": p.Name,
-		})
-		
-		if gamePlayers[i].Lives == 0 {
+			
+			
 			broadcast(map[string]interface{}{
-				"type": "player_dead",
+				"type": "player_damaged",
 				"id": p.ID,
+				"lives": gamePlayers[i].Lives,
 				"name": p.Name,
 			})
+			
+			if gamePlayers[i].Lives == 0 {
+				broadcast(map[string]interface{}{
+					"type": "player_dead",
+					"id": p.ID,
+					"name": p.Name,
+				})
+			}
+			break
 		}
-		break
 	}
 
+	alivePlayers := []Player{}
+	for _, p := range gamePlayers {
+		if p.Lives > 0 {
+			alivePlayers = append(alivePlayers, p)
+		}
+	}
+
+	if len(alivePlayers) == 1 {
+		winner := alivePlayers[0]
+		broadcast(map[string]interface{}{
+			"type": "game_winner",
+			"id":	winner.ID,
+			"name": winner.Name,
+		})
+	}else if len(alivePlayers) == 0 {
+		broadcast(map[string]interface{}{
+			"type": "game_draw",
+			"text": "No one survived!",
+		})
+	}
+
+}
+
+func plant_bomb(playerID string) {
+	mu.Lock()
+	var p *Player
+	for i := range gamePlayers {
+		if gamePlayers[i].ID == playerID {
+	
+			p = &gamePlayers[i]
+			break;
+		}
+	}
+	
+	if p == nil {
+		mu.Unlock()
+		return
+	}
+
+	if p.BombCount <= 0 {
+		mu.Unlock()
+		return
+	}
+	bombID := fmt.Sprintf("b_%d" , time.Now().UnixNano())
+	bomb := Bomb{
+		ID: bombID,
+		OwnerID: playerID,
+		X: p.X,
+		Y: p.Y,
+		Range: p.BombRange,
+		Timer: 2,
+	}
+
+	bombs[bombID] = bomb
+	p.BombCount--
+
+
+	mu.Unlock()
+
+	broadcast(map[string]interface{}{
+		"type": "bomb_planted",
+		"id": bomb.ID,
+		"x": bomb.X,
+		"y": bomb.Y,
+	})
+	 go bombCountdown(bombID)
+}
+
+
+func bombCountdown(bombID string) {
+	time.Sleep(2 * time.Second)
+	mu.Lock()
+
+	bomb, exists := bombs[bombID]
+	if !exists {
+		mu.Unlock()
+		return
+	}
+	delete(bombs, bombID)
+
+	mu.Unlock()
+
+	explodeBomb(bomb)
+}
+
+func explodeBomb(b Bomb) {
+	
+	
+	explosionCells := [][]int{
+		{b.X , b.Y},
+	}
+
+	dirs := [][]int{
+		{1,0},
+		{-1 ,0},
+		{0, -1},
+		{0,1},
+	}
+	var playersToDamage []Player
+		mu.Lock()
+	for _,d := range dirs {
+		dx , dy := d[0], d[1]
+		for i := 1; i <= b.Range; i++ {
+			nx := b.X + dx*i
+			ny := b.Y + dy*i
+
+
+			if ny < 0 || ny >= currentGrid.Rows || nx < 0 || nx >= currentGrid.Cols {
+				break
+			}
+
+			cell := currentGrid.Cells[ny][nx].Type
+	
+			if cell == "inner-wall" || cell == "wall" {
+				break
+			}
+
+			explosionCells = append(explosionCells, []int{nx,ny})
+
+			if cell == "stone" {
+				cellRef := &currentGrid.Cells[ny][nx]
+				cellRef.Type = "sand"
+				break
+			}
+		}
+	}
+	
+	for i := range gamePlayers {
+		p := &gamePlayers[i]
+
+		for _,c := range explosionCells {
+			if p.X == c[0] && p.Y == c[1] {
+				
+				playersToDamage = append(playersToDamage, *p)
+				break
+			}
+		}
+	}
+	mu.Unlock()
+
+	for _, p := range playersToDamage {
+
+		damagePlayer(p.ID,1)
+	}
+
+	broadcast(map[string]interface{}{
+		"type":      "bomb_exploded",
+		"id":       b.ID,
+        "cells":     explosionCells,
+        "owner_id":  b.OwnerID,
+	})
+
+
+	mu.Lock()
+	for i := range gamePlayers {
+		if gamePlayers[i].ID == b.OwnerID {
+			gamePlayers[i].BombCount++
+		}
+	}
+	mu.Unlock()
 }

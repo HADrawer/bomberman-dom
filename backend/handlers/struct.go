@@ -216,4 +216,16 @@ type Player struct {
     Name string `json:"name"`
 	Skin string `json:"skin"`
 	Lives int	`json:"lives"`
+
+	BombRange int `json:"bomb_range"`
+	BombCount int `json:"bomb_count"`
+}
+
+type Bomb struct {
+	ID 			string
+	OwnerID 	string
+	X 			int
+	Y 			int
+	Range 		int
+	Timer 		int
 }

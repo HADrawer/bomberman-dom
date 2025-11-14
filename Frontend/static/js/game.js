@@ -96,10 +96,12 @@ export function startGame(serverGrid, players) {
     }
   });
   // }
-  // ✅ Add key listener for placing bombs
   document.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "x") {
-      placeBomb();
+      socket.send(JSON.stringify({
+        type: "plant_bomb"
+      }));
+    return;
     }
   });
 
@@ -217,10 +219,30 @@ socket.onmessage = (event) => {
       break;
     }
 
+    case "bomb_planted": {
+      spawnBomb(msg.id,msg.x,msg.y);
+      break;
+    }
+
+    case "bomb_exploded":{
+      handleExplosion(msg.cells);
+      removeBomb(msg.id);
+      break;
+    }
+    case "game_winner": {
+      showGameOverlay(`${msg.name} wins the game! 🎉`);
+      break;
+    }
+    case "game_draw": {
+      showGameOverlay("It's a draw! 🤝");
+      break;
+    }
+
     default:
       console.log("Unknown message:", msg);
   }
 }
+
 
 function movePlayerLocally(direction) {
   let newX = localPlayer.x;
@@ -239,9 +261,13 @@ function movePlayerLocally(direction) {
   }
   if (newX < 0 || newX >= grid.cols || newY < 0 || newY >= grid.rows) return;
 
-  const targetCell = grid.cells[newY][newX];
-  if (targetCell.type !== "sand" && targetCell.type !== "start-zone") return;
+    const cellEl = document.querySelector(`.cell[data-row="${newY}"][data-col="${newX}"]`);
+  if (!cellEl) return;
 
+  // Allow movement only through sand and start-zone cells
+  if (!cellEl.classList.contains("sand") && !cellEl.classList.contains("start-zone")) {
+    return;
+  }
   const playerEl = document.getElementById(localPlayer.id);
 
   // 🧭 Update sprite direction before moving
@@ -258,55 +284,70 @@ function movePlayerLocally(direction) {
   // Notify the server
   socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction }));
 }
-function placeBomb() {
-  console.log("💣 Placing bomb at", localPlayer.x, localPlayer.y);
 
-  const cellEl = document.querySelector(
-    `.cell[data-row='${localPlayer.y}'][data-col='${localPlayer.x}']`
-  );
-
-  if (!cellEl) {
-    console.warn("⚠️ Could not find cell to place bomb.");
-    return;
-  }
-
-  // Avoid placing multiple bombs in one cell
-  if (cellEl.querySelector(".bomb")) {
-    console.log("⛔ A bomb is already here.");
-    return;
-  }
-
-  // Create bomb
-  const bombEl = document.createElement("div");
-  bombEl.classList.add("bomb");
-
-  // Append to current cell
-  cellEl.appendChild(bombEl);
-
-  // Simulate fuse countdown (3 seconds)
-  setTimeout(() => {
-    explodeBomb(bombEl, localPlayer.x, localPlayer.y);
-  }, 3000);
-}
 
 // 💥 Simulate explosion (remove bomb + show animation)
-function explodeBomb(bombEl, x, y) {
-  const cellEl = document.querySelector(
-    `.cell[data-row='${y}'][data-col='${x}']`
-  );
 
-  if (!cellEl) return;
 
-  // Remove the bomb
-  bombEl.remove();
+function spawnBomb(id,x,y) {
+  const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
+  if (!cell) return;
 
-  // Create explosion effect
-  const explosionEl = document.createElement("div");
-  explosionEl.classList.add("explosion");
-  cellEl.appendChild(explosionEl);
 
-  // Remove explosion after animation
-  setTimeout(() => explosionEl.remove(), 500);
+  const old = cell.querySelector(".bomb");
+  if (old) old.remove();
+
+  const bomb = document.createElement("div");
+  bomb.className = "bomb";
+  bomb.dataset.id = id;
+
+  cell.appendChild(bomb);
+}
+
+function removeBomb(bombID) {
+  const bombEl = document.querySelector(`.bomb[data-id="${bombID}"]`);
+  if (bombEl) bombEl.remove();
+}
+
+function handleExplosion(cells){
+  cells.forEach(([x,y]) => {
+    const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
+    if (!cell) return;
+
+     if (cell.classList.contains("stone")) {
+      cell.classList.remove("stone");
+      cell.classList.add("sand");
+    }
+
+    const flame = document.createElement("div");
+    flame.className = "flame";
+    cell.appendChild(flame);
+    setTimeout(() => flame.remove(), 300);
+  });
 }
 
 
+function showGameOverlay(text) {
+ 
+  let overlay = document.getElementById("winnerOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "winnerOverlay";
+    overlay.className = "winner-overlay";
+
+    const winnerText = document.createElement("h1");
+    winnerText.id = "winnerText";
+    overlay.appendChild(winnerText);
+
+    const restartBtn = document.createElement("button");
+    restartBtn.id = "restartBtn";
+    restartBtn.textContent = "Restart Game";
+    restartBtn.onclick = () => window.location.href = "/";
+    overlay.appendChild(restartBtn);
+
+    document.body.appendChild(overlay);
+  }
+
+  document.getElementById("winnerText").textContent = text;
+  overlay.style.display = "flex"; 
+}
