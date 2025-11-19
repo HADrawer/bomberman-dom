@@ -686,3 +686,23 @@ button:hover {
 #winnerOverlay button:hover {
   background: #218838;
 }
+
+.powerup {
+    width: 32px;
+    height: 32px;
+    position: absolute;
+    background-size: cover;
+    image-rendering: pixelated;
+}
+
+.powerup-bomb {
+    background-image: url("/static/css/sprites/bombs-increase.png");
+}
+
+.powerup-flame {
+    background-image: url("/static/css/sprites/Firepowerincrease.png");
+}
+
+.powerup-speed {
+    background-image: url("/static/css/sprites/speed-increase.png");
+}

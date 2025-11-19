@@ -195,11 +195,19 @@ type AllUsers struct{
 	Username string `json:"username"`
 }
 
+type PowerUp struct {
+    X int
+    Y int
+    Type string // "bomb", "speed", etc
+    Active bool
+}
 
 // Game grid cell
 type Cell struct {
     Type string `json:"type"`
+    PowerUp string // "" if no powerup, or "bomb", "flame", "speed"
 }
+
 
 // Full grid
 type Grid struct {

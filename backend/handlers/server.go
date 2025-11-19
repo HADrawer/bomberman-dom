@@ -56,6 +56,10 @@ func broadcastMessage(message interface{}) {
 		client.WriteMessage(websocket.TextMessage, msgBytes)
 	}
 }
+func init() {
+	// Seed RNG once
+	rand.Seed(time.Now().UnixNano())
+}
 
 func startTimer() {
 	if timerRunning {
@@ -386,7 +390,7 @@ func generateGrid(rows, cols int) Grid {
 				}
 			}
 
-			grid.Cells[r][c] = Cell{Type: cellType}
+grid.Cells[r][c] = Cell{Type: cellType, PowerUp: ""}
 		}
 	}
 
@@ -430,13 +434,14 @@ for _, clientData := range clients {
 	}
 	return players
 }
-
 func movePlayer(id, dir string) {
-	
 	mu.Lock()
 	for i, p := range gamePlayers {
 		if p.ID == id {
-			newX, newY := p.X, p.Y
+			// pointer to the real player in the slice (modify this, not the loop copy)
+			pp := &gamePlayers[i]
+
+			newX, newY := pp.X, pp.Y
 			switch dir {
 			case "up":
 				newY--
@@ -447,29 +452,78 @@ func movePlayer(id, dir string) {
 			case "right":
 				newX++
 			}
+
+			var pickedPickup map[string]interface{} = nil
+
 			if newY >= 0 && newY < currentGrid.Rows &&
-			newX >= 0 && newX < currentGrid.Cols {
-				
-				cellType := currentGrid.Cells[newY][newX].Type
-				if cellType == "sand" || cellType == "start-zone" {
-					gamePlayers[i].X = newX
-					gamePlayers[i].Y = newY
+				newX >= 0 && newX < currentGrid.Cols {
+
+				cell := &currentGrid.Cells[newY][newX]
+
+				// Walkable
+				if cell.Type == "sand" || cell.Type == "start-zone" {
+					// Move the real player
+					pp.X = newX
+					pp.Y = newY
+				}
+
+				// Pick up power-up if present (still inside lock)
+				if cell.PowerUp != "" {
+					powerType := cell.PowerUp
+					cell.PowerUp = "" // remove it from the grid
+
+					// Apply effect on the real player
+					switch powerType {
+					case "bomb":
+						pp.BombCount++
+						fmt.Printf("%s picked up bomb!\n", pp.Name)
+
+					case "flame":
+						pp.BombRange++
+						fmt.Printf("%s picked up flame!\n", pp.Name)
+
+					case "speed":
+						// no Speed field in Player struct, just log for now
+						fmt.Printf("%s picked up speed!\n", pp.Name)
+					}
+
+					fmt.Printf("Player %s picked up power-up: %s\n", pp.Name, powerType)
+
+					// prepare a pickup event to send after unlock (so we keep same unlock position)
+					pickedPickup = map[string]interface{}{
+						"type":     "powerup_picked",
+						"playerID": pp.ID,
+						"x":        pp.X,
+						"y":        pp.Y,
+						"powerup":  powerType,
+					}
 				}
 			}
+
+			// keep your original unlock position
 			mu.Unlock()
+
+			// original movement broadcast (unchanged format)
 			broadcast(map[string]interface{}{
-				"type": "player_moved",
-				"id":   p.ID,
-				"x":    gamePlayers[i].X,
-				"y":    gamePlayers[i].Y,
-				"name": p.Name,
-				"direction": dir, 
-				"lives": gamePlayers[i].Lives,
+				"type":      "player_moved",
+				"id":        p.ID,
+				"x":         gamePlayers[i].X,
+				"y":         gamePlayers[i].Y,
+				"name":      p.Name,
+				"direction": dir,
+				"lives":     gamePlayers[i].Lives,
 			})
+
+			// broadcast pickup if any (after unlock, same pattern you used elsewhere)
+			if pickedPickup != nil {
+				broadcast(pickedPickup)
+			}
+
 			break
 		}
 	}
 }
+
 
 func damagePlayer(id string, amount int) {
 
@@ -585,53 +639,71 @@ func bombCountdown(bombID string) {
 }
 
 func explodeBomb(b Bomb) {
-	
-	
 	explosionCells := [][]int{
-		{b.X , b.Y},
+		{b.X, b.Y},
 	}
 
 	dirs := [][]int{
-		{1,0},
-		{-1 ,0},
+		{1, 0},
+		{-1, 0},
 		{0, -1},
-		{0,1},
+		{0, 1},
 	}
 	var playersToDamage []Player
-		mu.Lock()
-	for _,d := range dirs {
-		dx , dy := d[0], d[1]
+
+	// 100% drop chance
+	const powerupDropChance = 100
+
+	// collect spawned powerups while under lock, broadcast after unlock
+	var spawned []map[string]interface{}
+
+	mu.Lock()
+	for _, d := range dirs {
+		dx, dy := d[0], d[1]
 		for i := 1; i <= b.Range; i++ {
 			nx := b.X + dx*i
 			ny := b.Y + dy*i
-
 
 			if ny < 0 || ny >= currentGrid.Rows || nx < 0 || nx >= currentGrid.Cols {
 				break
 			}
 
 			cell := currentGrid.Cells[ny][nx].Type
-	
+
 			if cell == "inner-wall" || cell == "wall" {
 				break
 			}
 
-			explosionCells = append(explosionCells, []int{nx,ny})
+			explosionCells = append(explosionCells, []int{nx, ny})
 
 			if cell == "stone" {
-				cellRef := &currentGrid.Cells[ny][nx]
-				cellRef.Type = "sand"
-				break
-			}
+    // Destroy the stone
+    cellRef := &currentGrid.Cells[ny][nx]
+    cellRef.Type = "sand"
+
+    // ALWAYS spawn a powerup
+    choices := []string{"bomb", "flame", "speed"}
+    ch := choices[rand.Intn(len(choices))]
+    cellRef.PowerUp = ch
+
+    // queue spawn event to frontend
+    spawned = append(spawned, map[string]interface{}{
+        "type":    "spawn_powerup",
+        "x":       nx,
+        "y":       ny,
+        "powerup": ch,
+    })
+
+    break
+}
+
 		}
 	}
-	
+
 	for i := range gamePlayers {
 		p := &gamePlayers[i]
-
-		for _,c := range explosionCells {
+		for _, c := range explosionCells {
 			if p.X == c[0] && p.Y == c[1] {
-				
 				playersToDamage = append(playersToDamage, *p)
 				break
 			}
@@ -639,18 +711,21 @@ func explodeBomb(b Bomb) {
 	}
 	mu.Unlock()
 
-	for _, p := range playersToDamage {
+	// Broadcast any spawned powerups
+	for _, ev := range spawned {
+		broadcast(ev)
+	}
 
-		damagePlayer(p.ID,1)
+	for _, p := range playersToDamage {
+		damagePlayer(p.ID, 1)
 	}
 
 	broadcast(map[string]interface{}{
-		"type":      "bomb_exploded",
+		"type":     "bomb_exploded",
 		"id":       b.ID,
-        "cells":     explosionCells,
-        "owner_id":  b.OwnerID,
+		"cells":    explosionCells,
+		"owner_id": b.OwnerID,
 	})
-
 
 	mu.Lock()
 	for i := range gamePlayers {
@@ -660,3 +735,4 @@ func explodeBomb(b Bomb) {
 	}
 	mu.Unlock()
 }
+

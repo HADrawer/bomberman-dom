@@ -2,6 +2,25 @@ import { socket } from "../ws.js";
 
 export let localPlayer = { id: null, x: 0, y: 0 };
 let grid = null;
+let powerups = {};
+function renderBoard() {
+    const gameArea = document.getElementById("gameArea");
+    if (!gameArea) return;
+
+    // Remove old powerups
+    document.querySelectorAll(".powerup").forEach(p => p.remove());
+
+    // Draw active powerups
+    for (let k in powerups) {
+        const p = powerups[k];
+        const el = document.createElement("div");
+        el.classList.add("powerup", `powerup-${p.type}`);
+        el.style.position = "absolute";
+        el.style.left = (p.x * 32) + "px";
+        el.style.top = (p.y * 32) + "px";
+        gameArea.appendChild(el);
+    }
+}
 
 export function startGame(serverGrid, players) {
   grid = serverGrid;
@@ -30,17 +49,33 @@ export function startGame(serverGrid, players) {
 
   // 1. Draw grid
   grid.cells.forEach((row, r) => {
-    const rowEl = document.createElement("div");
-    rowEl.className = "row";
-    row.forEach((cell, c) => {
-      const cellEl = document.createElement("div");
-      cellEl.className = `cell ${cell.type}`;
-      cellEl.dataset.row = r;
-      cellEl.dataset.col = c;
-      rowEl.appendChild(cellEl);
-    });
-    gameArea.appendChild(rowEl);
+  const rowEl = document.createElement("div");
+  rowEl.className = "row";
+
+  row.forEach((cell, c) => {
+    const cellEl = document.createElement("div");
+    cellEl.className = `cell ${cell.type}`;
+    cellEl.dataset.row = r;
+    cellEl.dataset.col = c;
+    rowEl.appendChild(cellEl);
+
+  
+    // If a powerup exists in this cell, draw it
+    if (cell.powerUp && cell.powerUp !== "") {
+      const p = document.createElement("div");
+      p.classList.add("powerup", `powerup-${cell.powerUp}`);
+      p.style.left = `${c * 32}px`;
+      p.style.top = `${r * 32}px`;
+      p.style.position = "absolute";
+      p.style.imageRendering = "pixelated";
+
+      gameArea.appendChild(p);
+    }
   });
+
+  gameArea.appendChild(rowEl);
+});
+
 
   // 2. Draw all players
   // 2. Draw all players
@@ -218,6 +253,20 @@ socket.onmessage = (event) => {
       }
       break;
     }
+case "spawn_powerup": {
+    const key = msg.x + "," + msg.y;
+
+    powerups[key] = {
+        type: msg.powerup,
+        x: msg.x,
+        y: msg.y,
+        timeout: Date.now() + 15000
+    };
+
+    renderBoard();
+    break;
+}
+
 
     case "bomb_planted": {
       spawnBomb(msg.id,msg.x,msg.y);
@@ -241,6 +290,14 @@ socket.onmessage = (event) => {
     default:
       console.log("Unknown message:", msg);
   }
+}
+function cleanupPowerups() {
+    const now = Date.now();
+    for (let k in powerups) {
+        if (powerups[k].timeout <= now) {
+            delete powerups[k];
+        }
+    }
 }
 
 
@@ -280,6 +337,20 @@ function movePlayerLocally(direction) {
   // Update local position
   localPlayer.x = newX;
   localPlayer.y = newY;
+
+
+  // 🎁 Pickup powerup if exists
+const key = newX + "," + newY;
+if (powerups[key]) {
+    socket.send(JSON.stringify({
+        type: "pickup_powerup",
+        id: localPlayer.id,
+        powerup: powerups[key].type,
+        x: newX,
+        y: newY
+    }));
+    delete powerups[key];
+}
 
   // Notify the server
   socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction }));
@@ -351,3 +422,8 @@ function showGameOverlay(text) {
   document.getElementById("winnerText").textContent = text;
   overlay.style.display = "flex"; 
 }
+// 🔄 Cleanup expired powerups every 200ms and redraw
+setInterval(() => {
+    cleanupPowerups();
+    renderBoard();
+}, 200);
