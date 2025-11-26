@@ -1,6 +1,6 @@
 import { socket } from "../ws.js";
 
-export let localPlayer = { id: null, x: 0, y: 0 };
+export let localPlayer = { id: null, x: 0, y: 0, speed: 1 };
 let grid = null;
 let powerups = {};
 function renderBoard() {
@@ -111,6 +111,7 @@ export function startGame(serverGrid, players) {
       localPlayer.id = p.id;
       localPlayer.x = p.x;
       localPlayer.y = p.y;
+      localPlayer.speed = p.speed || 1;
     }
   });
 
@@ -134,7 +135,9 @@ export function startGame(serverGrid, players) {
   document.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "x") {
       socket.send(JSON.stringify({
-        type: "plant_bomb"
+        type: "plant_bomb",
+        x: localPlayer.x,
+        y: localPlayer.y
       }));
       return;
     }
@@ -267,6 +270,18 @@ socket.onmessage = (event) => {
       break;
     }
 
+    case "powerup_picked": {
+      // Update local player's speed if they picked up the power-up
+      if (msg.playerID === localPlayer.id && msg.powerup === "speed") {
+        if (localPlayer.speed < 2) {
+          localPlayer.speed = 2;
+          console.log(`Speed increased! New speed: ${localPlayer.speed}`);
+        } else {
+          console.log(`Speed power-up picked but already at max speed: ${localPlayer.speed}`);
+        }
+      }
+      break;
+    }
 
     case "bomb_planted": {
       spawnBomb(msg.id, msg.x, msg.y);
@@ -302,54 +317,59 @@ function cleanupPowerups() {
 
 
 function movePlayerLocally(direction) {
-  let newX = localPlayer.x;
-  let newY = localPlayer.y;
-
-  switch (direction) {
-    case "up": newY--; break;
-    case "down": newY++; break;
-    case "left": newX--; break;
-    case "right": newX++; break;
-  }
-
-  if (!grid || !grid.cells[newY] || typeof newX !== "number" || typeof newY !== "number") {
-    console.warn("[Game] Invalid move coordinates:", newX, newY);
-    return;
-  }
-  if (newX < 0 || newX >= grid.cols || newY < 0 || newY >= grid.rows) return;
-
-  const cellEl = document.querySelector(`.cell[data-row="${newY}"][data-col="${newX}"]`);
-  if (!cellEl) return;
-
-  // Allow movement only through sand and start-zone cells
-  if (!cellEl.classList.contains("sand") && !cellEl.classList.contains("start-zone")) {
-    return;
-  }
   const playerEl = document.getElementById(localPlayer.id);
 
   // 🧭 Update sprite direction before moving
   playerEl.classList.remove("up", "down", "left", "right");
   playerEl.classList.add(direction);
 
-  // Move the player visually
-  placePlayerInCell(playerEl, newY, newX);
+  // Move based on speed (default 1, increases by 2 with speed power-up)
+  const speed = localPlayer.speed || 1;
 
-  // Update local position
-  localPlayer.x = newX;
-  localPlayer.y = newY;
+  for (let step = 0; step < speed; step++) {
+    let newX = localPlayer.x;
+    let newY = localPlayer.y;
 
+    switch (direction) {
+      case "up": newY--; break;
+      case "down": newY++; break;
+      case "left": newX--; break;
+      case "right": newX++; break;
+    }
 
-  // 🎁 Pickup powerup if exists
-  const key = newX + "," + newY;
-  if (powerups[key]) {
-    socket.send(JSON.stringify({
-      type: "pickup_powerup",
-      id: localPlayer.id,
-      powerup: powerups[key].type,
-      x: newX,
-      y: newY
-    }));
-    delete powerups[key];
+    if (!grid || !grid.cells[newY] || typeof newX !== "number" || typeof newY !== "number") {
+      console.warn("[Game] Invalid move coordinates:", newX, newY);
+      break;
+    }
+    if (newX < 0 || newX >= grid.cols || newY < 0 || newY >= grid.rows) break;
+
+    const cellEl = document.querySelector(`.cell[data-row="${newY}"][data-col="${newX}"]`);
+    if (!cellEl) break;
+
+    // Allow movement only through sand and start-zone cells
+    if (!cellEl.classList.contains("sand") && !cellEl.classList.contains("start-zone")) {
+      break;
+    }
+
+    // Update local position
+    localPlayer.x = newX;
+    localPlayer.y = newY;
+
+    // Move the player visually
+    placePlayerInCell(playerEl, newY, newX);
+
+    // 🎁 Pickup powerup if exists
+    const key = newX + "," + newY;
+    if (powerups[key]) {
+      socket.send(JSON.stringify({
+        type: "pickup_powerup",
+        id: localPlayer.id,
+        powerup: powerups[key].type,
+        x: newX,
+        y: newY
+      }));
+      delete powerups[key];
+    }
   }
 
   // Notify the server

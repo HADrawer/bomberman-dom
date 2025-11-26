@@ -14,9 +14,8 @@ type MyMessage struct {
 	From string `json:"from"`
 	To   string `json:"to"`
 	Text string `json:"text"`
-	Set int   `json:"set"`
+	Set  int    `json:"set"`
 	Read string `json:"isread"`
-
 }
 
 // Struct to define a session
@@ -121,11 +120,11 @@ type ServerUser struct {
 	Username  string `json:"username"`
 	Privilege int    `json:"privilege"`
 	Password  string `json:"password"`
-	lastMsgId int `json:"lastmsgfid"`
+	lastMsgId int    `json:"lastmsgfid"`
 }
 
 type ServerMessage struct {
-	AllUsers	[]string		   `json:"allusers"`
+	AllUsers    []string          `json:"allusers"`
 	Type        string            `json:"type"`
 	Users       []ServerUser      `json:"users"`
 	Categories  []ServerCategory  `json:"categories"`
@@ -190,50 +189,49 @@ type ServerComment struct {
 	IsEdited       bool      `json:"isedited"`
 }
 
-
-type AllUsers struct{
+type AllUsers struct {
 	Username string `json:"username"`
 }
 
 type PowerUp struct {
-    X int
-    Y int
-    Type string // "bomb", "speed", etc
-    Active bool
+	X      int
+	Y      int
+	Type   string // "bomb", "speed", etc
+	Active bool
 }
 
 // Game grid cell
 type Cell struct {
-    Type string `json:"type"`
-    PowerUp string // "" if no powerup, or "bomb", "flame", "speed"
+	Type    string `json:"type"`
+	PowerUp string // "" if no powerup, or "bomb", "flame", "speed"
 }
-
 
 // Full grid
 type Grid struct {
-    Rows  int       `json:"rows"`
-    Cols  int       `json:"cols"`
-    Cells [][]Cell  `json:"cells"`
+	Rows  int      `json:"rows"`
+	Cols  int      `json:"cols"`
+	Cells [][]Cell `json:"cells"`
 }
 
 // Player info
 type Player struct {
-    ID   string `json:"id"`
-    X    int    `json:"x"`
-    Y    int    `json:"y"`
-    Name string `json:"name"`
-	Skin string `json:"skin"`
-	Lives int	`json:"lives"`
+	ID    string `json:"id"`
+	X     int    `json:"x"`
+	Y     int    `json:"y"`
+	Name  string `json:"name"`
+	Skin  string `json:"skin"`
+	Lives int    `json:"lives"`
 
 	BombRange int `json:"bomb_range"`
 	BombCount int `json:"bomb_count"`
+	Speed     int `json:"speed"`
 }
 
 type Bomb struct {
-	ID 			string
-	OwnerID 	string
-	X 			int
-	Y 			int
-	Range 		int
-	Timer 		int
+	ID      string
+	OwnerID string
+	X       int
+	Y       int
+	Range   int
+	Timer   int
 }
