@@ -4,22 +4,22 @@ export let localPlayer = { id: null, x: 0, y: 0 };
 let grid = null;
 let powerups = {};
 function renderBoard() {
-    const gameArea = document.getElementById("gameArea");
-    if (!gameArea) return;
+  const gameArea = document.getElementById("gameArea");
+  if (!gameArea) return;
 
-    // Remove old powerups
-    document.querySelectorAll(".powerup").forEach(p => p.remove());
+  // Remove old powerups
+  document.querySelectorAll(".powerup").forEach(p => p.remove());
 
-    // Draw active powerups
-    for (let k in powerups) {
-        const p = powerups[k];
-        const el = document.createElement("div");
-        el.classList.add("powerup", `powerup-${p.type}`);
-        el.style.position = "absolute";
-        el.style.left = (p.x * 32) + "px";
-        el.style.top = (p.y * 32) + "px";
-        gameArea.appendChild(el);
-    }
+  // Draw active powerups
+  for (let k in powerups) {
+    const p = powerups[k];
+    const el = document.createElement("div");
+    el.classList.add("powerup", `powerup-${p.type}`);
+    el.style.position = "absolute";
+    el.style.left = (p.x * 42) + "px";  // 40px cell + 2px gap
+    el.style.top = (p.y * 42) + "px";   // 40px cell + 2px gap
+    gameArea.appendChild(el);
+  }
 }
 
 export function startGame(serverGrid, players) {
@@ -49,32 +49,32 @@ export function startGame(serverGrid, players) {
 
   // 1. Draw grid
   grid.cells.forEach((row, r) => {
-  const rowEl = document.createElement("div");
-  rowEl.className = "row";
+    const rowEl = document.createElement("div");
+    rowEl.className = "row";
 
-  row.forEach((cell, c) => {
-    const cellEl = document.createElement("div");
-    cellEl.className = `cell ${cell.type}`;
-    cellEl.dataset.row = r;
-    cellEl.dataset.col = c;
-    rowEl.appendChild(cellEl);
+    row.forEach((cell, c) => {
+      const cellEl = document.createElement("div");
+      cellEl.className = `cell ${cell.type}`;
+      cellEl.dataset.row = r;
+      cellEl.dataset.col = c;
+      rowEl.appendChild(cellEl);
 
-  
-    // If a powerup exists in this cell, draw it
-    if (cell.powerUp && cell.powerUp !== "") {
-      const p = document.createElement("div");
-      p.classList.add("powerup", `powerup-${cell.powerUp}`);
-      p.style.left = `${c * 32}px`;
-      p.style.top = `${r * 32}px`;
-      p.style.position = "absolute";
-      p.style.imageRendering = "pixelated";
 
-      gameArea.appendChild(p);
-    }
+      // If a powerup exists in this cell, draw it
+      if (cell.powerUp && cell.powerUp !== "") {
+        const p = document.createElement("div");
+        p.classList.add("powerup", `powerup-${cell.powerUp}`);
+        p.style.left = `${c * 42}px`;  // 40px cell + 2px gap
+        p.style.top = `${r * 42}px`;   // 40px cell + 2px gap
+        p.style.position = "absolute";
+        p.style.imageRendering = "pixelated";
+
+        gameArea.appendChild(p);
+      }
+    });
+
+    gameArea.appendChild(rowEl);
   });
-
-  gameArea.appendChild(rowEl);
-});
 
 
   // 2. Draw all players
@@ -136,7 +136,7 @@ export function startGame(serverGrid, players) {
       socket.send(JSON.stringify({
         type: "plant_bomb"
       }));
-    return;
+      return;
     }
   });
 
@@ -253,27 +253,27 @@ socket.onmessage = (event) => {
       }
       break;
     }
-case "spawn_powerup": {
-    const key = msg.x + "," + msg.y;
+    case "spawn_powerup": {
+      const key = msg.x + "," + msg.y;
 
-    powerups[key] = {
+      powerups[key] = {
         type: msg.powerup,
         x: msg.x,
         y: msg.y,
         timeout: Date.now() + 15000
-    };
+      };
 
-    renderBoard();
-    break;
-}
-
-
-    case "bomb_planted": {
-      spawnBomb(msg.id,msg.x,msg.y);
+      renderBoard();
       break;
     }
 
-    case "bomb_exploded":{
+
+    case "bomb_planted": {
+      spawnBomb(msg.id, msg.x, msg.y);
+      break;
+    }
+
+    case "bomb_exploded": {
       handleExplosion(msg.cells);
       removeBomb(msg.id);
       break;
@@ -292,12 +292,12 @@ case "spawn_powerup": {
   }
 }
 function cleanupPowerups() {
-    const now = Date.now();
-    for (let k in powerups) {
-        if (powerups[k].timeout <= now) {
-            delete powerups[k];
-        }
+  const now = Date.now();
+  for (let k in powerups) {
+    if (powerups[k].timeout <= now) {
+      delete powerups[k];
     }
+  }
 }
 
 
@@ -318,7 +318,7 @@ function movePlayerLocally(direction) {
   }
   if (newX < 0 || newX >= grid.cols || newY < 0 || newY >= grid.rows) return;
 
-    const cellEl = document.querySelector(`.cell[data-row="${newY}"][data-col="${newX}"]`);
+  const cellEl = document.querySelector(`.cell[data-row="${newY}"][data-col="${newX}"]`);
   if (!cellEl) return;
 
   // Allow movement only through sand and start-zone cells
@@ -340,17 +340,17 @@ function movePlayerLocally(direction) {
 
 
   // 🎁 Pickup powerup if exists
-const key = newX + "," + newY;
-if (powerups[key]) {
+  const key = newX + "," + newY;
+  if (powerups[key]) {
     socket.send(JSON.stringify({
-        type: "pickup_powerup",
-        id: localPlayer.id,
-        powerup: powerups[key].type,
-        x: newX,
-        y: newY
+      type: "pickup_powerup",
+      id: localPlayer.id,
+      powerup: powerups[key].type,
+      x: newX,
+      y: newY
     }));
     delete powerups[key];
-}
+  }
 
   // Notify the server
   socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction }));
@@ -360,7 +360,7 @@ if (powerups[key]) {
 // 💥 Simulate explosion (remove bomb + show animation)
 
 
-function spawnBomb(id,x,y) {
+function spawnBomb(id, x, y) {
   const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
   if (!cell) return;
 
@@ -380,12 +380,12 @@ function removeBomb(bombID) {
   if (bombEl) bombEl.remove();
 }
 
-function handleExplosion(cells){
-  cells.forEach(([x,y]) => {
+function handleExplosion(cells) {
+  cells.forEach(([x, y]) => {
     const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
     if (!cell) return;
 
-     if (cell.classList.contains("stone")) {
+    if (cell.classList.contains("stone")) {
       cell.classList.remove("stone");
       cell.classList.add("sand");
     }
@@ -399,7 +399,7 @@ function handleExplosion(cells){
 
 
 function showGameOverlay(text) {
- 
+
   let overlay = document.getElementById("winnerOverlay");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -420,10 +420,10 @@ function showGameOverlay(text) {
   }
 
   document.getElementById("winnerText").textContent = text;
-  overlay.style.display = "flex"; 
+  overlay.style.display = "flex";
 }
 // 🔄 Cleanup expired powerups every 200ms and redraw
 setInterval(() => {
-    cleanupPowerups();
-    renderBoard();
+  cleanupPowerups();
+  renderBoard();
 }, 200);
