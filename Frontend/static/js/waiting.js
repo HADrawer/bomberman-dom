@@ -3,13 +3,27 @@ import { socket } from "../ws.js";
 export async function showWaitingRoom() {
   const app = document.getElementById("app");
   const playerName = localStorage.getItem("playerName");
+  const playerSkin = localStorage.getItem("playerSkin") || "character1";
 
-   const playerListFromServer = await getPlayerList();
-  const connectedPlayers = new Set(playerListFromServer);
+  const playerListFromServer = await getPlayerList();
+  // Store players as objects with name and skin
+  const connectedPlayers = new Map();
 
-  connectedPlayers.add(playerName);
+  // Add players from server
+  playerListFromServer.forEach(player => {
+    if (typeof player === 'string') {
+      // Old format compatibility
+      connectedPlayers.set(player, { name: player, skin: "character1" });
+    } else {
+      // New format with skin
+      connectedPlayers.set(player.name, { name: player.name, skin: player.skin || "character1" });
+    }
+  });
 
-app.innerHTML = `
+  // Add current player
+  connectedPlayers.set(playerName, { name: playerName, skin: playerSkin });
+
+  app.innerHTML = `
   <div class="waiting-page">
     
     <!-- LEFT FRAME: Waiting Room Info -->
@@ -21,10 +35,11 @@ app.innerHTML = `
 
       <div class="waiting-players">
         <h3 class="players-title">Connected Players:</h3>
-        <div class="players-list">
-          ${Array.from(connectedPlayers).map(player => `
+        <div class="players-list" id="player-list">
+          ${Array.from(connectedPlayers.values()).map(player => `
             <div class="player-item">
-              👤 ${player} ${player === playerName ? '<span class="you">(You)</span>' : ''}
+              <div class="player-avatar" data-skin="${player.skin}"></div>
+              <span class="player-name">${player.name} ${player.name === playerName ? '<span class="you">(You)</span>' : ''}</span>
             </div>
           `).join('')}
         </div>
@@ -44,117 +59,145 @@ app.innerHTML = `
 
   const timerEl = document.getElementById("timer");
   const startBtn = document.getElementById("startGameBtn");
-//   const debugDiv = document.getElementById("debug");
+  //   const debugDiv = document.getElementById("debug");
   const playerList = document.getElementById("player-list");
 
-  
-
-//   const connectedPlayers = new Set([playerName]);
-
-//   function logDebug(message) {
-//     const p = document.createElement("p");
-//     p.style.color = 'blue';
-//     p.textContent = `DEBUG: ${message}`;
-//     debugDiv.appendChild(p);
-//     console.log(message);
-//   }
-
-//     logDebug(`Waiting room loaded for: ${playerName}`);
 
 
+  //   const connectedPlayers = new Set([playerName]);
+
+  //   function logDebug(message) {
+  //     const p = document.createElement("p");
+  //     p.style.color = 'blue';
+  //     p.textContent = `DEBUG: ${message}`;
+  //     debugDiv.appendChild(p);
+  //     console.log(message);
+  //   }
+
+  //     logDebug(`Waiting room loaded for: ${playerName}`);
 
 
- 
 
-socket.addEventListener("message", (event) => {
-     try {
-        const msg = JSON.parse(event.data);
 
-        if (msg.type === "user_joined") {
-            if (!connectedPlayers.has(msg.name)) {
-                connectedPlayers.add(msg.name);
-                updatePlayersList();
-            }
+
+
+  socket.addEventListener("message", (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+
+      if (msg.type === "user_joined") {
+        if (!connectedPlayers.has(msg.name)) {
+          connectedPlayers.set(msg.name, {
+            name: msg.name,
+            skin: msg.skin || "character1"
+          });
+          updatePlayersList();
         }
-        else if (msg.type === "player_list") {
-            // This is the most important part!
-            connectedPlayers.clear();
-            msg.players.forEach(player => {
-                connectedPlayers.add(player);
+      }
+      else if (msg.type === "player_list") {
+        // This is the most important part!
+        connectedPlayers.clear();
+        msg.players.forEach(player => {
+          if (typeof player === 'string') {
+            connectedPlayers.set(player, { name: player, skin: "character1" });
+          } else {
+            connectedPlayers.set(player.name, {
+              name: player.name,
+              skin: player.skin || "character1"
             });
-            updatePlayersList();
-        }
-        else if (msg.type === "user_left") {
-            connectedPlayers.delete(msg.name);
-            updatePlayersList();
-        }
-        else if (msg.type === "timer"){
-            timerEl.textContent = `⏳ ${msg.time_left} second left...`
-        }
-        else if (msg.type === "waiting") {
-            timerEl.textContent = msg.message   
-        }
-        else if (msg.type === "start_game"){
-            timerEl.textContent = "🚀 Game started!";
+          }
+        });
+        // Re-add current player with their skin
+        connectedPlayers.set(playerName, { name: playerName, skin: playerSkin });
+        updatePlayersList();
+      }
+      else if (msg.type === "user_left") {
+        connectedPlayers.delete(msg.name);
+        updatePlayersList();
+      }
+      else if (msg.type === "timer") {
+        timerEl.textContent = `⏳ ${msg.time_left} second left...`
+      }
+      else if (msg.type === "waiting") {
+        timerEl.textContent = msg.message
+      }
+      else if (msg.type === "start_game") {
+        timerEl.textContent = "🚀 Game started!";
         import("./game.js").then(module => {
           module.startGame(msg.grid, msg.players);
-        }); 
-        }
+        });
+      }
 
     } catch (error) {
-        console.error('Error parsing message:', error);
+      console.error('Error parsing message:', error);
     }
-});
-
-function updatePlayersList() {
-     playerList.innerHTML = '';
-    
-    connectedPlayers.forEach(player => {
-        const isCurrentUser = player === playerName;
-        const playerEl = document.createElement("div");
-        playerEl.className = 'player-item';
-        playerEl.textContent = `👤 ${player} ${isCurrentUser ? '(You)' : ''}`;
-        playerEl.style.color = isCurrentUser ? 'green' : 'black';
-        playerEl.style.margin = '5px 0';
-        playerEl.style.padding = '5px';
-        playerEl.style.backgroundColor = '#f0f0f0';
-        playerEl.style.borderRadius = '4px';
-        playerList.appendChild(playerEl);
-    });
-}
-
-async function getPlayerList() {
-  return new Promise((resolve) => {
-    // Send request to get player list
-    socket.send(JSON.stringify({ type: "get_players" }));
-    
-    // Set up a one-time listener for the response
-    const handlePlayerList = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "player_list") {
-          socket.removeEventListener('message', handlePlayerList);
-          resolve(msg.players || []);
-        }
-      } catch (error) {
-        console.error('Error parsing player list:', error);
-        resolve([]);
-      }
-    };
-    
-    socket.addEventListener('message', handlePlayerList);
-    
-    // Timeout after 3 seconds
-    setTimeout(() => {
-      socket.removeEventListener('message', handlePlayerList);
-      resolve([]);
-    }, 3000);
   });
-}
+
+  function updatePlayersList() {
+    const playerList = document.getElementById('player-list');
+    if (!playerList) return;
+
+    playerList.innerHTML = '';
+
+    connectedPlayers.forEach(player => {
+      const isCurrentUser = player.name === playerName;
+      const playerEl = document.createElement("div");
+      playerEl.className = 'player-item';
+
+      // Create avatar div
+      const avatarDiv = document.createElement("div");
+      avatarDiv.className = 'player-avatar';
+      avatarDiv.dataset.skin = player.skin || "character1";
+
+      // Create name span
+      const nameSpan = document.createElement("span");
+      nameSpan.className = 'player-name';
+      nameSpan.innerHTML = `${player.name} ${isCurrentUser ? '<span class="you">(You)</span>' : ''}`;
+
+      playerEl.appendChild(avatarDiv);
+      playerEl.appendChild(nameSpan);
+
+      if (isCurrentUser) {
+        playerEl.style.borderColor = '#00ff88';
+        playerEl.style.boxShadow = '0 0 0 2px #000, 0 0 10px #00ff88';
+      }
+
+      playerList.appendChild(playerEl);
+    });
+  }
+
+  async function getPlayerList() {
+    return new Promise((resolve) => {
+      // Send request to get player list
+      socket.send(JSON.stringify({ type: "get_players" }));
+
+      // Set up a one-time listener for the response
+      const handlePlayerList = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "player_list") {
+            socket.removeEventListener('message', handlePlayerList);
+            resolve(msg.players || []);
+          }
+        } catch (error) {
+          console.error('Error parsing player list:', error);
+          resolve([]);
+        }
+      };
+
+      socket.addEventListener('message', handlePlayerList);
+
+      // Timeout after 3 seconds
+      setTimeout(() => {
+        socket.removeEventListener('message', handlePlayerList);
+        resolve([]);
+      }, 3000);
+    });
+  }
 
 
   import("../chat/app.js").then(chat => {
-    chat.buildApp(); 
+    chat.buildApp();
   });
 
 }

@@ -120,9 +120,12 @@ func sendPlayerList(conn *websocket.Conn) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	players := make([]string, 0, len(clients))
+	players := make([]map[string]string, 0, len(clients))
 	for _, clientData := range clients {
-		players = append(players, clientData.Name)
+		players = append(players, map[string]string{
+			"name": clientData.Name,
+			"skin": clientData.Skin,
+		})
 	}
 
 	playerListMsg := map[string]interface{}{

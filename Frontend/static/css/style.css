@@ -227,12 +227,15 @@ button:hover {
   background: rgba(255, 255, 255, 0.1);
   margin: 4px auto;
   width: 70%;
-  padding: 6px;
+  padding: 8px 12px;
   border: 2px solid #ffd700;
   box-shadow: 0 0 0 2px #000;
   font-size: 13px;
-  text-align: center;
+  text-align: left;
   transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .player-item:hover {
@@ -247,6 +250,47 @@ button:hover {
 .player-item[style*="green"] {
   border-color: #00ff88;
   box-shadow: 0 0 0 2px #000, 0 0 10px #00ff88;
+}
+
+/* Player Avatar in Waiting Room */
+.player-avatar {
+  width: 40px;
+  height: 40px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  border: 2px solid #ffd700;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.player-avatar[data-skin="character1"] {
+  background-image: url("/static/css/sprites/character1-front.png");
+}
+
+.player-avatar[data-skin="character2"] {
+  background-image: url("/static/css/sprites/character2-front.png");
+}
+
+.player-avatar[data-skin="character3"] {
+  background-image: url("/static/css/sprites/character3-front.png");
+}
+
+.player-avatar[data-skin="character4"] {
+  background-image: url("/static/css/sprites/character4-front.png");
+}
+
+.player-name {
+  flex-grow: 1;
+  color: #fffacd;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.player-name .you {
+  color: #00ff88;
+  font-weight: bold;
+  margin-left: 5px;
 }
 
 /* 💬 CHAT */
