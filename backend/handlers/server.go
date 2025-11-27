@@ -450,31 +450,42 @@ func movePlayer(id, dir string) {
 			// pointer to the real player in the slice (modify this, not the loop copy)
 			pp := &gamePlayers[i]
 
-			newX, newY := pp.X, pp.Y
-			switch dir {
-			case "up":
-				newY--
-			case "down":
-				newY++
-			case "left":
-				newX--
-			case "right":
-				newX++
-			}
-
 			var pickedPickup map[string]interface{} = nil
 
-			if newY >= 0 && newY < currentGrid.Rows &&
-				newX >= 0 && newX < currentGrid.Cols {
+			// Move based on player's speed (1 or 2 steps)
+			speed := pp.Speed
+			if speed < 1 {
+				speed = 1
+			}
+
+			for step := 0; step < speed; step++ {
+				newX, newY := pp.X, pp.Y
+				switch dir {
+				case "up":
+					newY--
+				case "down":
+					newY++
+				case "left":
+					newX--
+				case "right":
+					newX++
+				}
+
+				if newY < 0 || newY >= currentGrid.Rows ||
+					newX < 0 || newX >= currentGrid.Cols {
+					break
+				}
 
 				cell := &currentGrid.Cells[newY][newX]
 
 				// Walkable
-				if cell.Type == "sand" || cell.Type == "start-zone" {
-					// Move the real player
-					pp.X = newX
-					pp.Y = newY
+				if cell.Type != "sand" && cell.Type != "start-zone" {
+					break
 				}
+
+				// Move the real player
+				pp.X = newX
+				pp.Y = newY
 
 				// Pick up power-up if present (still inside lock)
 				if cell.PowerUp != "" {
@@ -511,7 +522,7 @@ func movePlayer(id, dir string) {
 						"powerup":  powerType,
 					}
 				}
-			}
+			} // end of speed loop
 
 			// keep your original unlock position
 			mu.Unlock()

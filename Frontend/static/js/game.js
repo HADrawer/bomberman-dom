@@ -271,6 +271,11 @@ socket.onmessage = (event) => {
     }
 
     case "powerup_picked": {
+      // Remove the power-up from ALL clients when any player picks it up
+      const key = msg.x + "," + msg.y;
+      delete powerups[key];
+      renderBoard();
+
       // Update local player's speed if they picked up the power-up
       if (msg.playerID === localPlayer.id && msg.powerup === "speed") {
         if (localPlayer.speed < 2) {
