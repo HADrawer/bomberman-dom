@@ -119,27 +119,98 @@ export function startGame(serverGrid, players) {
   // if (myPlayer) {
   gameArea.addEventListener("click", () => gameArea.focus());
 
-  document.addEventListener("keydown", (e) => {
-    let dir = null;
-    switch (e.key.toLowerCase()) {
-      case "arrowup": dir = "up"; break;
-      case "arrowdown": dir = "down"; break;
-      case "arrowleft": dir = "left"; break;
-      case "arrowright": dir = "right"; break;
+  // Movement interval settings
+  const BASE_MOVE_INTERVAL_MS = 500;  // Normal speed: 500ms (half second)
+  const FAST_MOVE_INTERVAL_MS = 250;  // With speed power-up: 250ms (quarter second)
+  let currentDirection = null;
+  let moveInterval = null;
+
+  function getMoveInterval() {
+    // Speed 1 = 500ms, Speed 2 = 250ms
+    return localPlayer.speed >= 2 ? FAST_MOVE_INTERVAL_MS : BASE_MOVE_INTERVAL_MS;
+  }
+
+  function getDirectionFromKey(key) {
+    switch (key) {
+      case "arrowup": return "up";
+      case "arrowdown": return "down";
+      case "arrowleft": return "left";
+      case "arrowright": return "right";
+      default: return null;
     }
+  }
+
+  function startMoving(dir) {
+    if (currentDirection === dir) return; // Already moving in this direction
+
+    stopMoving(); // Clear any existing movement
+    currentDirection = dir;
+
+    // Move immediately on first key press
+    movePlayerLocally(dir);
+
+    // Then continue moving at the current speed interval while key is held
+    moveInterval = setInterval(() => {
+      movePlayerLocally(currentDirection);
+    }, getMoveInterval());
+  }
+
+  function stopMoving() {
+    if (moveInterval) {
+      clearInterval(moveInterval);
+      moveInterval = null;
+    }
+    currentDirection = null;
+  }
+
+  // Update movement interval when speed changes (called when picking up speed power-up)
+  function updateMoveSpeed() {
+    if (moveInterval && currentDirection) {
+      clearInterval(moveInterval);
+      moveInterval = setInterval(() => {
+        movePlayerLocally(currentDirection);
+      }, getMoveInterval());
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const key = e.key.toLowerCase();
+    const dir = getDirectionFromKey(key);
+
     if (dir) {
-      movePlayerLocally(dir);
+      e.preventDefault(); // Prevent scrolling with arrow keys
+      startMoving(dir);
     }
   });
-  // }
+
+  document.addEventListener("keyup", (e) => {
+    const key = e.key.toLowerCase();
+    const dir = getDirectionFromKey(key);
+
+    // Only stop if the released key matches the current direction
+    if (dir && dir === currentDirection) {
+      stopMoving();
+    }
+  });
+
+  // Bomb placement (X key)
+  let bombKeyHeld = false;
+
   document.addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() === "x") {
+    const key = e.key.toLowerCase();
+    if (key === "x" && !bombKeyHeld) {
+      bombKeyHeld = true;
       socket.send(JSON.stringify({
         type: "plant_bomb",
         x: localPlayer.x,
         y: localPlayer.y
       }));
-      return;
+    }
+  });
+
+  document.addEventListener("keyup", (e) => {
+    if (e.key.toLowerCase() === "x") {
+      bombKeyHeld = false;
     }
   });
 
@@ -324,7 +395,7 @@ function cleanupPowerups() {
 function movePlayerLocally(direction) {
   const playerEl = document.getElementById(localPlayer.id);
 
-  // 🧭 Update sprite direction before moving
+  // Update sprite direction before moving
   playerEl.classList.remove("up", "down", "left", "right");
   playerEl.classList.add(direction);
 
@@ -363,7 +434,7 @@ function movePlayerLocally(direction) {
     // Move the player visually
     placePlayerInCell(playerEl, newY, newX);
 
-    // 🎁 Pickup powerup if exists
+    // Pickup powerup if exists
     const key = newX + "," + newY;
     if (powerups[key]) {
       socket.send(JSON.stringify({
@@ -382,7 +453,7 @@ function movePlayerLocally(direction) {
 }
 
 
-// 💥 Simulate explosion (remove bomb + show animation)
+//  Simulate explosion (remove bomb + show animation)
 
 
 function spawnBomb(id, x, y) {
@@ -447,7 +518,7 @@ function showGameOverlay(text) {
   document.getElementById("winnerText").textContent = text;
   overlay.style.display = "flex";
 }
-// 🔄 Cleanup expired powerups every 200ms and redraw
+//  Cleanup expired powerups every 200ms and redraw
 setInterval(() => {
   cleanupPowerups();
   renderBoard();
