@@ -323,8 +323,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// if !ok {
 			// 	log.Println("Unknown connection tried to move.")
 			// }
-
-			go movePlayer(moveMsg.ID, moveMsg.Direction)
+			println(moveMsg.ID)
+			println(moveMsg.Direction)
+			 movePlayer(moveMsg.ID, moveMsg.Direction)
 
 		case "damage":
 			var d struct {
@@ -437,7 +438,8 @@ func assignPlayers() []Player {
 			Lives:     3,
 			BombRange: 1,
 			BombCount: 1,
-			Speed:     1,
+			MoveCooldown: 500 * time.Millisecond,
+			NextMoveTime: time.Now(),
 		})
 		i++
 	}
@@ -447,18 +449,22 @@ func movePlayer(id, dir string) {
 	mu.Lock()
 	for i, p := range gamePlayers {
 		if p.ID == id {
-			// pointer to the real player in the slice (modify this, not the loop copy)
+
 			pp := &gamePlayers[i]
 
+			print("1")
+			
+			// Move based on player's speed (1 or 2 steps)
+			if time.Now().Before(pp.NextMoveTime){
+				mu.Unlock()
+				return
+			}
+			print("2")
+			pp.NextMoveTime = time.Now().Add(pp.MoveCooldown)
+			
 			var pickedPickup map[string]interface{} = nil
 
-			// Move based on player's speed (1 or 2 steps)
-			speed := pp.Speed
-			if speed < 1 {
-				speed = 1
-			}
-
-			for step := 0; step < speed; step++ {
+			
 				newX, newY := pp.X, pp.Y
 				switch dir {
 				case "up":
@@ -473,14 +479,16 @@ func movePlayer(id, dir string) {
 
 				if newY < 0 || newY >= currentGrid.Rows ||
 					newX < 0 || newX >= currentGrid.Cols {
-					break
+					mu.Unlock()
+					return
 				}
 
 				cell := &currentGrid.Cells[newY][newX]
 
 				// Walkable
 				if cell.Type != "sand" && cell.Type != "start-zone" {
-					break
+					mu.Unlock()
+					return
 				}
 
 				// Move the real player
@@ -503,12 +511,8 @@ func movePlayer(id, dir string) {
 						fmt.Printf("%s picked up flame!\n", pp.Name)
 
 					case "speed":
-						if pp.Speed < 2 {
-							pp.Speed = 2
-							fmt.Printf("%s picked up speed! Speed is now: %d\n", pp.Name, pp.Speed)
-						} else {
-							fmt.Printf("%s picked up speed but already at max speed: %d\n", pp.Name, pp.Speed)
-						}
+					pp.MoveCooldown = pp.MoveCooldown / 2
+					
 					}
 
 					fmt.Printf("Player %s picked up power-up: %s\n", pp.Name, powerType)
@@ -522,7 +526,7 @@ func movePlayer(id, dir string) {
 						"powerup":  powerType,
 					}
 				}
-			} // end of speed loop
+			
 
 			// keep your original unlock position
 			mu.Unlock()
@@ -536,7 +540,7 @@ func movePlayer(id, dir string) {
 				"name":      p.Name,
 				"direction": dir,
 				"lives":     gamePlayers[i].Lives,
-				"speed":     gamePlayers[i].Speed,
+				// "speed":     p.MoveCooldown / time.Millisecond,
 			})
 
 			// broadcast pickup if any (after unlock, same pattern you used elsewhere)

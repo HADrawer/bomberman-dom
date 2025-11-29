@@ -224,7 +224,8 @@ type Player struct {
 
 	BombRange int `json:"bomb_range"`
 	BombCount int `json:"bomb_count"`
-	Speed     int `json:"speed"`
+	MoveCooldown  time.Duration
+    NextMoveTime  time.Time
 }
 
 type Bomb struct {
