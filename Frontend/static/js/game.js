@@ -32,7 +32,7 @@ export function startGame(serverGrid, players) {
 
     <!-- LEFT = GAME -->
     <div class="game-left">
-      <p style="text-align:center; margin-top:5px;">Use WASD or Arrow Keys • Press X to place bomb</p>
+      <p style="text-align:center; margin-top:5px;">Use Arrow Keys • Press X to place bomb</p>
       <div id="gameArea" class="grid" tabindex="0"></div>
     </div>
 
