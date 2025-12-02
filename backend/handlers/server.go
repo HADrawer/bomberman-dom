@@ -26,10 +26,10 @@ var upgrader = websocket.Upgrader{
 }
 
 type ClientData struct {
-	Name string
-	Skin string
+	Name      string
+	Skin      string
 	SessionID string
-    GameState string
+	GameState string
 }
 
 var (
@@ -59,6 +59,7 @@ func broadcastMessage(message interface{}) {
 		client.WriteMessage(websocket.TextMessage, msgBytes)
 	}
 }
+
 func init() {
 	// Seed RNG once
 	rand.Seed(time.Now().UnixNano())
@@ -86,7 +87,7 @@ func startTimer() {
 				} else {
 					currentGrid = generateGrid(11, 15) // same dimensions as frontend
 					gamePlayers = assignPlayers()
-
+					
 					// Broadcast game start with grid + players
 					broadcast(map[string]interface{}{
 						"type":    "start_game",
@@ -96,8 +97,9 @@ func startTimer() {
 					mu.Lock()
 					for conn, clientData := range clients {
 						for _, p := range gamePlayers {
-							if p.Name == clientData.Name {
+							if p.SessionID == clientData.SessionID {
 								connToPlayerID[conn] = p.ID
+								clientData.GameState = "StateInGame"
 								break
 							}
 						}
@@ -125,10 +127,11 @@ func sendPlayerList(conn *websocket.Conn) {
 	players := make([]map[string]string, 0, len(clients))
 	for _, clientData := range clients {
 		players = append(players, map[string]string{
-			"name": clientData.Name,
-			"skin": clientData.Skin,
+			"name":    clientData.Name,
+			"skin":    clientData.Skin,
 			"session": clientData.SessionID,
 		})
+		
 	}
 
 	playerListMsg := map[string]interface{}{
@@ -240,12 +243,10 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			
-
 			currentUserID = session
 
 			mu.Lock()
-			clients[conn] = ClientData{Name: name, Skin: skin , SessionID: session , GameState: "in_waiting"}
+			clients[conn] = ClientData{Name: name, Skin: skin, SessionID: session, GameState: "waiting_room"}
 			mu.Unlock()
 
 			log.Printf("User set name: %s with skin: %s", name, skin)
@@ -269,7 +270,6 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			userJoinedBytes, _ := json.Marshal(userJoinedMsg)
 
-			
 			updateTimerBaseOnPlayers()
 			mu.Lock()
 			for client, clientData := range clients { // Don't send the join notification to the user who just joined
@@ -308,7 +308,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// Register connection only once per user
 			if currentUserID == "" {
 				currentUserID = myMessage.From
-				//registerSocket(currentUserID, conn)
+				// registerSocket(currentUserID, conn)
 			}
 
 		case "move":
@@ -327,7 +327,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// }
 			println(moveMsg.ID)
 			println(moveMsg.Direction)
-			 movePlayer(moveMsg.ID, moveMsg.Direction)
+			movePlayer(moveMsg.ID, moveMsg.Direction)
 
 		case "damage":
 			var d struct {
@@ -350,6 +350,57 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			playerID := connToPlayerID[conn]
 			plant_bomb(playerID, bombMsg.X, bombMsg.Y)
+		
+		case "reconnect":
+			var msg map[string]interface{}
+			if err := json.Unmarshal(message, &msg); err != nil {
+				log.Printf("Error parsing set_name message: %v", err)
+				continue
+			}
+			mu.Lock()
+			session := msg["session"].(string)
+
+			state := ""
+			for _, clientData := range clients {
+						
+					if session == clientData.SessionID {
+								
+							state = clientData.GameState  
+							break
+					}
+						
+					}
+
+			if state == "" {
+				mu.Unlock()
+				conn.WriteJSON(map[string]interface{}{
+					"type":  "reconnect_status",
+					"state": "not_found",
+				})
+				return
+			}
+
+			mu.Unlock()
+			switch state {
+				case "waiting_room":
+					conn.WriteJSON(map[string]interface{}{
+						"type":  "reconnect_status",
+						"state": "waiting_room",
+					})
+				case "in_game":
+					conn.WriteJSON(map[string]interface{}{
+						"type":    "reconnect_status",
+						"state":   "in_game",
+						"grid":    currentGrid,
+						"players": gamePlayers,
+					})
+
+				// case StateDead:
+				// 	conn.WriteJSON(map[string]interface{}{
+				// 		"type":  "reconnect_status",
+				// 		"state": "dead",
+				// 	})
+				}
 		}
 
 	}
@@ -432,14 +483,16 @@ func assignPlayers() []Player {
 		}
 		spawn := spawnPoints[i]
 		players = append(players, Player{
-			ID:        fmt.Sprintf("p%d", i+1),
-			X:         spawn[1],
-			Y:         spawn[0],
-			Name:      clientData.Name,
-			Skin:      clientData.Skin,
-			Lives:     3,
-			BombRange: 1,
-			BombCount: 1,
+			ID:           fmt.Sprintf("p%d", i+1),
+			X:            spawn[1],
+			Y:            spawn[0],
+			Name:         clientData.Name,
+			SessionID:    clientData.SessionID,
+			State: 		  StateInGame,
+			Skin:         clientData.Skin,
+			Lives:        3,
+			BombRange:    1,
+			BombCount:    1,
 			MoveCooldown: 500 * time.Millisecond,
 			NextMoveTime: time.Now(),
 		})
@@ -447,6 +500,7 @@ func assignPlayers() []Player {
 	}
 	return players
 }
+
 func movePlayer(id, dir string) {
 	mu.Lock()
 	for i, p := range gamePlayers {
@@ -455,80 +509,78 @@ func movePlayer(id, dir string) {
 			pp := &gamePlayers[i]
 
 			print("1")
-			
+
 			// Move based on player's speed (1 or 2 steps)
-			if time.Now().Before(pp.NextMoveTime){
+			if time.Now().Before(pp.NextMoveTime) {
 				mu.Unlock()
 				return
 			}
 			print("2")
 			pp.NextMoveTime = time.Now().Add(pp.MoveCooldown)
-			
+
 			var pickedPickup map[string]interface{} = nil
 
-			
-				newX, newY := pp.X, pp.Y
-				switch dir {
-				case "up":
-					newY--
-				case "down":
-					newY++
-				case "left":
-					newX--
-				case "right":
-					newX++
-				}
+			newX, newY := pp.X, pp.Y
+			switch dir {
+			case "up":
+				newY--
+			case "down":
+				newY++
+			case "left":
+				newX--
+			case "right":
+				newX++
+			}
 
-				if newY < 0 || newY >= currentGrid.Rows ||
-					newX < 0 || newX >= currentGrid.Cols {
-					mu.Unlock()
-					return
-				}
+			if newY < 0 || newY >= currentGrid.Rows ||
+				newX < 0 || newX >= currentGrid.Cols {
+				mu.Unlock()
+				return
+			}
 
-				cell := &currentGrid.Cells[newY][newX]
+			cell := &currentGrid.Cells[newY][newX]
 
-				// Walkable
-				if cell.Type != "sand" && cell.Type != "start-zone" {
-					mu.Unlock()
-					return
-				}
+			// Walkable
+			if cell.Type != "sand" && cell.Type != "start-zone" {
+				mu.Unlock()
+				return
+			}
 
-				// Move the real player
-				pp.X = newX
-				pp.Y = newY
+			// Move the real player
+			pp.X = newX
+			pp.Y = newY
 
-				// Pick up power-up if present (still inside lock)
-				if cell.PowerUp != "" {
-					powerType := cell.PowerUp
-					cell.PowerUp = "" // remove it from the grid
+			// Pick up power-up if present (still inside lock)
+			if cell.PowerUp != "" {
+				powerType := cell.PowerUp
+				cell.PowerUp = "" // remove it from the grid
 
-					// Apply effect on the real player
-					switch powerType {
-					case "bomb":
-						pp.BombCount++
-						fmt.Printf("%s picked up bomb!\n", pp.Name)
+				// Apply effect on the real player
+				switch powerType {
+				case "bomb":
+					pp.BombCount++
+					fmt.Printf("%s picked up bomb!\n", pp.Name)
 
-					case "flame":
-						pp.BombRange++
-						fmt.Printf("%s picked up flame!\n", pp.Name)
+				case "flame":
+					pp.BombRange++
+					fmt.Printf("%s picked up flame!\n", pp.Name)
 
-					case "speed":
+				case "speed":
 					pp.MoveCooldown = pp.MoveCooldown / 2
-					
-					}
 
-					fmt.Printf("Player %s picked up power-up: %s\n", pp.Name, powerType)
-
-					// prepare a pickup event to send after unlock (so we keep same unlock position)
-					pickedPickup = map[string]interface{}{
-						"type":     "powerup_picked",
-						"playerID": pp.ID,
-						"x":        pp.X,
-						"y":        pp.Y,
-						"powerup":  powerType,
-					}
 				}
-			
+
+				fmt.Printf("Player %s picked up power-up: %s\n", pp.Name, powerType)
+
+				// prepare a pickup event to send after unlock (so we keep same unlock position)
+				pickedPickup = map[string]interface{}{
+					"type":     "powerup_picked",
+					"playerID": pp.ID,
+					"x":        pp.X,
+					"y":        pp.Y,
+					"powerup":  powerType,
+				}
+			}
 
 			// keep your original unlock position
 			mu.Unlock()
@@ -556,7 +608,6 @@ func movePlayer(id, dir string) {
 }
 
 func damagePlayer(id string, amount int) {
-
 	for i, p := range gamePlayers {
 		if p.ID == id {
 			gamePlayers[i].Lives -= amount
@@ -602,7 +653,6 @@ func damagePlayer(id string, amount int) {
 			"text": "No one survived!",
 		})
 	}
-
 }
 
 func plant_bomb(playerID string, x int, y int) {
