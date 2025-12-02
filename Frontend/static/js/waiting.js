@@ -4,6 +4,7 @@ export async function showWaitingRoom() {
   const app = document.getElementById("app");
   const playerName = localStorage.getItem("playerName");
   const playerSkin = localStorage.getItem("playerSkin") || "character1";
+  const playerSession = localStorage.getItem("sessionId");
 
   const playerListFromServer = await getPlayerList();
   // Store players as objects with name and skin
@@ -11,17 +12,14 @@ export async function showWaitingRoom() {
 
   // Add players from server
   playerListFromServer.forEach(player => {
-    if (typeof player === 'string') {
-      // Old format compatibility
-      connectedPlayers.set(player, { name: player, skin: "character1" });
-    } else {
+    
       // New format with skin
-      connectedPlayers.set(player.name, { name: player.name, skin: player.skin || "character1" });
-    }
+      connectedPlayers.set(player.session, { session: player.session, name: player.name, skin: player.skin || "character1" });
+    
   });
 
   // Add current player
-  connectedPlayers.set(playerName, { name: playerName, skin: playerSkin });
+  connectedPlayers.set(playerSession, { session: playerSession, name: playerName, skin: playerSkin });
 
   app.innerHTML = `
   <div class="waiting-page">
@@ -39,7 +37,7 @@ export async function showWaitingRoom() {
           ${Array.from(connectedPlayers.values()).map(player => `
             <div class="player-item">
               <div class="player-avatar" data-skin="${player.skin}"></div>
-              <span class="player-name">${player.name} ${player.name === playerName ? '<span class="you">(You)</span>' : ''}</span>
+              <span class="player-name">${player.name} ${player.session === playerSession ? '<span class="you">(You)</span>' : ''}</span>
             </div>
           `).join('')}
         </div>
@@ -64,20 +62,7 @@ export async function showWaitingRoom() {
 
 
 
-  //   const connectedPlayers = new Set([playerName]);
-
-  //   function logDebug(message) {
-  //     const p = document.createElement("p");
-  //     p.style.color = 'blue';
-  //     p.textContent = `DEBUG: ${message}`;
-  //     debugDiv.appendChild(p);
-  //     console.log(message);
-  //   }
-
-  //     logDebug(`Waiting room loaded for: ${playerName}`);
-
-
-
+ 
 
 
 
@@ -86,8 +71,8 @@ export async function showWaitingRoom() {
       const msg = JSON.parse(event.data);
 
       if (msg.type === "user_joined") {
-        if (!connectedPlayers.has(msg.name)) {
-          connectedPlayers.set(msg.name, {
+        if (!connectedPlayers.has(msg.session)) {
+          connectedPlayers.set(msg.session, {
             name: msg.name,
             skin: msg.skin || "character1"
           });
@@ -98,21 +83,20 @@ export async function showWaitingRoom() {
         // This is the most important part!
         connectedPlayers.clear();
         msg.players.forEach(player => {
-          if (typeof player === 'string') {
-            connectedPlayers.set(player, { name: player, skin: "character1" });
-          } else {
-            connectedPlayers.set(player.name, {
+          
+            connectedPlayers.set(player.session, {
+              session: player.session,
               name: player.name,
               skin: player.skin || "character1"
             });
-          }
+          
         });
         // Re-add current player with their skin
-        connectedPlayers.set(playerName, { name: playerName, skin: playerSkin });
+        connectedPlayers.set(playerSession, { session: playerSession, name: playerName, skin: playerSkin });
         updatePlayersList();
       }
       else if (msg.type === "user_left") {
-        connectedPlayers.delete(msg.name);
+        connectedPlayers.delete(msg.session);
         updatePlayersList();
       }
       else if (msg.type === "timer") {
@@ -140,7 +124,7 @@ export async function showWaitingRoom() {
     playerList.innerHTML = '';
 
     connectedPlayers.forEach(player => {
-      const isCurrentUser = player.name === playerName;
+      const isCurrentUser = player.session === playerSession;
       const playerEl = document.createElement("div");
       playerEl.className = 'player-item';
 

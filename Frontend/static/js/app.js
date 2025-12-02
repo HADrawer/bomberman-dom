@@ -49,11 +49,22 @@ document.addEventListener("DOMContentLoaded", () => {
       const name = document.getElementById("playerName").value.trim();
       if (!name) return alert("Name is required!");
       if (!selectedSkin) return alert("Please select a character!");
+      
+      let sessionId = localStorage.getItem("sessionId");
+      if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem("sessionId", sessionId);
+      }
 
       localStorage.setItem("playerName", name);
       localStorage.setItem("playerSkin", selectedSkin);
 
-      socket.send(JSON.stringify({ type: "set_name", name, skin: selectedSkin }));
+      socket.send(JSON.stringify({ 
+        type: "set_name",
+        name,
+        skin: selectedSkin,
+        sessionId : sessionId
+       }));
       loadWaitingRoom();
     }
 

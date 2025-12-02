@@ -221,11 +221,11 @@ type Player struct {
 	Name  string `json:"name"`
 	Skin  string `json:"skin"`
 	Lives int    `json:"lives"`
-
 	BombRange int `json:"bomb_range"`
 	BombCount int `json:"bomb_count"`
 	MoveCooldown  time.Duration
     NextMoveTime  time.Time
+	
 }
 
 type Bomb struct {
