@@ -13,7 +13,7 @@ export class App {
 
   constructor(vApp, $target, state) {
     this.vApp = vApp;
-    this.vAppOld = JSON.parse(JSON.stringify(vApp));
+    this.vAppOld = this.#cloneVNode(vApp);
     this.$app = render(vApp);
     $target.replaceWith(this.$app);
     this.eventRegister = new EventRegister(this.$app);
@@ -43,11 +43,27 @@ export class App {
 
   #setEventRegisterOnVNodes() {
     this.traverse(this.vApp, (vNode) => {
-      if (typeof vNode === "string") {
+      if (typeof vNode === "string" || !vNode || typeof vNode !== "object") {
         return;
       }
       vNode.eventRegister = this.eventRegister;
     });
+  }
+
+  #cloneVNode(vNode) {
+    if (typeof vNode === "string") {
+      return vNode;
+    }
+    if (!vNode || typeof vNode !== "object") {
+      return vNode;
+    }
+
+    // Clone VNode without parent and eventRegister to avoid circular references
+    return {
+      tagName: vNode.tagName,
+      attrs: { ...vNode.attrs },
+      children: vNode.children ? vNode.children.map(child => this.#cloneVNode(child)) : []
+    };
   }
 
   setRoutes(routes) {
@@ -77,9 +93,12 @@ export class App {
       }
     });
 
+    // Set event register on newly created VNodes
+    this.#setEventRegisterOnVNodes();
+
     const patch = diff(this.vAppOld, this.vApp);
     this.$app = patch(this.$app);
-    this.vAppOld = JSON.parse(JSON.stringify(this.vApp));
+    this.vAppOld = this.#cloneVNode(this.vApp);
 
     checked = document.querySelectorAll(".toggle");
     checked.forEach((checkbox) => {
