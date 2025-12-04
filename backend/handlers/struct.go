@@ -219,15 +219,13 @@ type Player struct {
 	X     int    `json:"x"`
 	Y     int    `json:"y"`
 	Name  string `json:"name"`
-	SessionID string `json:"session"`
-	State PlayerState
 	Skin  string `json:"skin"`
 	Lives int    `json:"lives"`
+
 	BombRange int `json:"bomb_range"`
 	BombCount int `json:"bomb_count"`
 	MoveCooldown  time.Duration
     NextMoveTime  time.Time
-	
 }
 
 type Bomb struct {
@@ -238,11 +236,3 @@ type Bomb struct {
 	Range   int
 	Timer   int
 }
-
-type PlayerState string
-
-const (
-    StateWaiting PlayerState = "waiting_room"
-    StateInGame  PlayerState = "in_game"
-    StateDead    PlayerState = "dead"
-)

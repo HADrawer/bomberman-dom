@@ -1,78 +1,163 @@
 import { socket } from "../ws.js";
+import { VNode, App } from "../Framework/over-react.js";
 
-export async function showWaitingRoom() {
-  const app = document.getElementById("app");
+let app = null;
+
+export async function showWaitingRoom(mountPoint) {
+  const appContainer = mountPoint || document.getElementById("app");
   const playerName = localStorage.getItem("playerName");
   const playerSkin = localStorage.getItem("playerSkin") || "character1";
-  const playerSession = localStorage.getItem("sessionId");
 
   const playerListFromServer = await getPlayerList();
-  // Store players as objects with name and skin
   const connectedPlayers = new Map();
 
-  // Add players from server
   playerListFromServer.forEach(player => {
-    
-      // New format with skin
-      connectedPlayers.set(player.session, { session: player.session, name: player.name, skin: player.skin || "character1" });
-    
+    if (typeof player === 'string') {
+      connectedPlayers.set(player, { name: player, skin: "character1" });
+    } else {
+      connectedPlayers.set(player.name, { name: player.name, skin: player.skin || "character1" });
+    }
   });
 
-  // Add current player
-  connectedPlayers.set(playerSession, { session: playerSession, name: playerName, skin: playerSkin });
+  connectedPlayers.set(playerName, { name: playerName, skin: playerSkin });
 
-  app.innerHTML = `
-  <div class="waiting-page">
-    
-    <!-- LEFT FRAME: Waiting Room Info -->
-    <div class="waiting-left">
-      <h1 class="waiting-title">Waiting Room</h1>
-      <p class="waiting-welcome">Welcome <strong>${playerName}</strong> 👋</p>
-      <p class="waiting-status">Waiting for other players...</p>
-      <p id="timer" class="waiting-timer">⏳ Waiting...</p>
+  const waitingPage = new VNode("div", {
+    attrs: { class: "waiting-page", id: "waiting-page" }
+  });
+  const waitingLeft = new VNode("div", {
+    attrs: { class: "waiting-left", id: "waiting-left" }
+  });
 
-      <div class="waiting-players">
-        <h3 class="players-title">Connected Players:</h3>
-        <div class="players-list" id="player-list">
-          ${Array.from(connectedPlayers.values()).map(player => `
-            <div class="player-item">
-              <div class="player-avatar" data-skin="${player.skin}"></div>
-              <span class="player-name">${player.name} ${player.session === playerSession ? '<span class="you">(You)</span>' : ''}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </div>
+  const title = new VNode("h1", {
+    attrs: { class: "waiting-title" },
+    children: ["Waiting Room"]
+  });
 
-    <!-- RIGHT FRAME: Chat Box -->
-    <div class="waiting-right">
-      <h3 class="chat-title"> Bomber Man Chat
-</h3>
-      <div id="chat" class="chat-box"></div>
-    </div>
+  const welcome = new VNode("p", {
+    attrs: { class: "waiting-welcome" },
+    children: ["Welcome ", new VNode("strong", { children: [playerName] }), " 👋"]
+  });
 
-  </div>
-`;
+  const status = new VNode("p", {
+    attrs: { class: "waiting-status" },
+    children: ["Waiting for other players..."]
+  });
 
+  const timer = new VNode("p", {
+    attrs: { id: "timer", class: "waiting-timer" },
+    children: ["⏳ Waiting..."]
+  });
 
-  const timerEl = document.getElementById("timer");
-  const startBtn = document.getElementById("startGameBtn");
-  //   const debugDiv = document.getElementById("debug");
-  const playerList = document.getElementById("player-list");
+  const waitingPlayers = new VNode("div", {
+    attrs: { class: "waiting-players", id: "waiting-players" }
+  });
 
+  const playersTitle = new VNode("h3", {
+    attrs: { class: "players-title" },
+    children: ["Connected Players:"]
+  });
 
+  const playerList = new VNode("div", {
+    attrs: { class: "players-list", id: "player-list" }
+  });
 
- 
+  // Initial player list population
+  connectedPlayers.forEach(player => {
+    const isCurrentUser = player.name === playerName;
 
+    const playerItem = new VNode("div", {
+      attrs: {
+        class: 'player-item',
+        id: `player-${player.name}`,
+        style: isCurrentUser ? 'border-color: #00ff88; box-shadow: 0 0 0 2px #000, 0 0 10px #00ff88;' : ''
+      }
+    });
 
+    const avatarDiv = new VNode("div", {
+      attrs: {
+        class: 'player-avatar',
+        'data-skin': player.skin || "character1"
+      }
+    });
+
+    const youSpan = isCurrentUser ? new VNode("span", { attrs: { class: "you" }, children: ["(You)"] }) : "";
+    const nameSpan = new VNode("span", {
+      attrs: { class: 'player-name' },
+      children: [player.name, " ", youSpan]
+    });
+
+    playerItem.append(avatarDiv, nameSpan);
+    playerList.append(playerItem);
+  });
+
+  waitingPlayers.append(playersTitle, playerList);
+  waitingLeft.append(title, welcome, status, timer, waitingPlayers);
+
+  const waitingRight = new VNode("div", {
+    attrs: { class: "waiting-right", id: "waiting-right" }
+  });
+
+  const chatTitle = new VNode("h3", {
+    attrs: { class: "chat-title" },
+    children: ["Chat"]
+  });
+
+  const chatBox = new VNode("div", {
+    attrs: { id: "chat", class: "chat-box", "data-ignore": "true" }
+  });
+
+  waitingRight.append(chatTitle, chatBox);
+
+  waitingPage.append(waitingLeft, waitingRight);
+
+  app = new App(waitingPage, appContainer, {});
+
+  const timerEl = app.getVNodeById("timer");
+
+  function updatePlayersList() {
+    const playerListVNode = app.getVNodeById('player-list');
+    if (!playerListVNode) return;
+
+    playerListVNode.children = [];
+
+    connectedPlayers.forEach(player => {
+      const isCurrentUser = player.name === playerName;
+
+      const playerItem = new VNode("div", {
+        attrs: {
+          class: 'player-item',
+          id: `player-${player.name}`,
+          style: isCurrentUser ? 'border-color: #00ff88; box-shadow: 0 0 0 2px #000, 0 0 10px #00ff88;' : ''
+        }
+      }, app);
+
+      const avatarDiv = new VNode("div", {
+        attrs: {
+          class: 'player-avatar',
+          'data-skin': player.skin || "character1"
+        }
+      }, app);
+
+      const youSpan = isCurrentUser ? new VNode("span", { attrs: { class: "you" }, children: ["(You)"] }, app) : "";
+      const nameSpan = new VNode("span", {
+        attrs: { class: 'player-name' },
+        children: [player.name, " ", youSpan]
+      }, app);
+
+      playerItem.append(avatarDiv, nameSpan);
+      playerListVNode.append(playerItem);
+    });
+
+    app.update();
+  }
 
   socket.addEventListener("message", (event) => {
     try {
       const msg = JSON.parse(event.data);
 
       if (msg.type === "user_joined") {
-        if (!connectedPlayers.has(msg.session)) {
-          connectedPlayers.set(msg.session, {
+        if (!connectedPlayers.has(msg.name)) {
+          connectedPlayers.set(msg.name, {
             name: msg.name,
             skin: msg.skin || "character1"
           });
@@ -80,35 +165,38 @@ export async function showWaitingRoom() {
         }
       }
       else if (msg.type === "player_list") {
-        // This is the most important part!
         connectedPlayers.clear();
         msg.players.forEach(player => {
-          
-            connectedPlayers.set(player.session, {
-              session: player.session,
+          if (typeof player === 'string') {
+            connectedPlayers.set(player, { name: player, skin: "character1" });
+          } else {
+            connectedPlayers.set(player.name, {
               name: player.name,
               skin: player.skin || "character1"
             });
-          
+          }
         });
-        // Re-add current player with their skin
-        connectedPlayers.set(playerSession, { session: playerSession, name: playerName, skin: playerSkin });
+        connectedPlayers.set(playerName, { name: playerName, skin: playerSkin });
         updatePlayersList();
       }
       else if (msg.type === "user_left") {
-        connectedPlayers.delete(msg.session);
+        connectedPlayers.delete(msg.name);
         updatePlayersList();
       }
       else if (msg.type === "timer") {
-        timerEl.textContent = `⏳ ${msg.time_left} second left...`
+        const secondText = msg.time_left === 1 ? "second" : "seconds";
+        timerEl.children = [`⏳ ${msg.time_left} ${secondText} left...`];
+        app.update();
       }
       else if (msg.type === "waiting") {
-        timerEl.textContent = msg.message
+        timerEl.children = [msg.message];
+        app.update();
       }
       else if (msg.type === "start_game") {
-        timerEl.textContent = "🚀 Game started!";
+        timerEl.children = ["🚀 Game started!"];
+        app.update();
         import("./game.js").then(module => {
-          module.startGame(msg.grid, msg.players);
+          module.startGame(msg.grid, msg.players, app.$app);
         });
       }
 
@@ -117,45 +205,19 @@ export async function showWaitingRoom() {
     }
   });
 
-  function updatePlayersList() {
-    const playerList = document.getElementById('player-list');
-    if (!playerList) return;
+  app.update();
 
-    playerList.innerHTML = '';
-
-    connectedPlayers.forEach(player => {
-      const isCurrentUser = player.session === playerSession;
-      const playerEl = document.createElement("div");
-      playerEl.className = 'player-item';
-
-      // Create avatar div
-      const avatarDiv = document.createElement("div");
-      avatarDiv.className = 'player-avatar';
-      avatarDiv.dataset.skin = player.skin || "character1";
-
-      // Create name span
-      const nameSpan = document.createElement("span");
-      nameSpan.className = 'player-name';
-      nameSpan.innerHTML = `${player.name} ${isCurrentUser ? '<span class="you">(You)</span>' : ''}`;
-
-      playerEl.appendChild(avatarDiv);
-      playerEl.appendChild(nameSpan);
-
-      if (isCurrentUser) {
-        playerEl.style.borderColor = '#00ff88';
-        playerEl.style.boxShadow = '0 0 0 2px #000, 0 0 10px #00ff88';
-      }
-
-      playerList.appendChild(playerEl);
+  // Load chat after DOM is painted
+  requestAnimationFrame(() => {
+    import("../chat/app.js").then(chat => {
+      chat.buildApp();
     });
-  }
+  });
 
   async function getPlayerList() {
     return new Promise((resolve) => {
-      // Send request to get player list
       socket.send(JSON.stringify({ type: "get_players" }));
 
-      // Set up a one-time listener for the response
       const handlePlayerList = (event) => {
         try {
           const msg = JSON.parse(event.data);
@@ -171,17 +233,11 @@ export async function showWaitingRoom() {
 
       socket.addEventListener('message', handlePlayerList);
 
-      // Timeout after 3 seconds
       setTimeout(() => {
         socket.removeEventListener('message', handlePlayerList);
         resolve([]);
       }, 3000);
     });
   }
-
-
-  import("../chat/app.js").then(chat => {
-    chat.buildApp();
-  });
 
 }

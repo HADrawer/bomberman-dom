@@ -35,7 +35,13 @@ export function diff(vOldNode, vNewNode) {
   }
 
   const patchAttrs = diffAttrs(vOldNode.attrs, vNewNode.attrs);
-  const patchChildren = diffChildren(vOldNode.children, vNewNode.children);
+
+  let patchChildren;
+  if (vNewNode.attrs && vNewNode.attrs['data-ignore']) {
+    patchChildren = ($node) => $node;
+  } else {
+    patchChildren = diffChildren(vOldNode.children, vNewNode.children);
+  }
 
   return ($node) => {
     patchAttrs($node);
@@ -49,7 +55,9 @@ function diffAttrs(oldAttrs, newAttrs) {
 
   for (const [k, v] of Object.entries(newAttrs)) {
     patches.push(($node) => {
-      $node.setAttribute(k, v);
+      if ($node && $node.setAttribute) {
+        $node.setAttribute(k, v);
+      }
       return $node;
     });
   }
@@ -57,16 +65,20 @@ function diffAttrs(oldAttrs, newAttrs) {
   for (const k in oldAttrs) {
     if (!(k in newAttrs)) {
       patches.push(($node) => {
-        $node.removeAttribute(k);
+        if ($node && $node.removeAttribute) {
+          $node.removeAttribute(k);
+        }
         return $node;
       });
     }
   }
 
   return ($node) => {
+    if (!$node) return $node;
     for (const patch of patches) {
       patch($node);
     }
+    return $node;
   };
 }
 
@@ -86,12 +98,22 @@ function diffChildren(oldChildren, newChildren) {
   }
 
   return ($parent) => {
+    if (!$parent || !$parent.childNodes) return $parent;
+
     for (const [patch, child] of zip(childPatches, $parent.childNodes)) {
-      patch(child);
+      if (!patch && child) {
+        child.remove();
+        continue;
+      }
+      if (patch && child) {
+        patch(child);
+      }
     }
 
     for (const patch of additionalPatches) {
-      patch($parent);
+      if ($parent) {
+        patch($parent);
+      }
     }
 
     return $parent;

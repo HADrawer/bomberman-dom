@@ -1,82 +1,153 @@
 import { socket } from "../ws.js";
+import { VNode, App } from "../Framework/over-react.js";
+
+let app = null;
+
 
 document.addEventListener("DOMContentLoaded", () => {
-  const app = document.getElementById("app");
+  const appContainer = document.getElementById("app");
 
   function showLobbyScreen() {
-    app.innerHTML = `
-      <div class="container">
-        <h1 class="bomberman">Bomberman</h1>
-        <div id="lobbyStartBtn" class="start-text"><span class="arrow">></span> Start</div>
-      </div>
-    `;
-    document.getElementById("lobbyStartBtn").addEventListener("click", showNameScreen);
+    const container = new VNode("div", {
+      attrs: { class: "container", id: "lobby-container" }
+    });
+
+    const title = new VNode("h1", {
+      attrs: { class: "bomberman" },
+      children: ["Bomberman"]
+    });
+
+    const arrow = new VNode("span", {
+      attrs: { class: "arrow" },
+      children: [">"]
+    });
+
+    const startBtn = new VNode("div", {
+      attrs: { id: "lobbyStartBtn", class: "start-text" },
+      children: [arrow, " Start"]
+    });
+
+    container.append(title, startBtn);
+
+    app = new App(container, appContainer, {});
+
+    const startBtnVNode = app.getVNodeById("lobbyStartBtn");
+    startBtnVNode.listenEvent("onclick", showNameScreen);
   }
 
   function showNameScreen() {
-    app.innerHTML = `
-      <div class="container">
-        <h1 class="heading-text">Enter Your Name:</h1>
-        <input type="text" id="playerName" placeholder="Your name here" />
-        <br><br>
+    const container = new VNode("div", {
+      attrs: { class: "container", id: "name-container" }
+    });
 
-        <h2>Select Your Character:</h2>
+    const headingText = new VNode("h1", {
+      attrs: { class: "heading-text" },
+      children: ["Enter Your Name:"]
+    });
 
-        <div class="character-select">
-          <div class="char-box" data-skin="character1"></div>
-          <div class="char-box" data-skin="character2"></div>
-          <div class="char-box" data-skin="character3"></div>
-          <div class="char-box" data-skin="character4"></div>
-        </div>
+    const nameInput = new VNode("input", {
+      attrs: {
+        type: "text",
+        id: "playerName",
+        placeholder: "Your name here"
+      }
+    });
 
-        <br><br>
-        <div id="startBtn" class="start-text"><span class="arrow">></span> Join</div>
-      </div>
-    `;
+    const br1 = new VNode("br", { attrs: {} });
+    const br2 = new VNode("br", { attrs: {} });
 
-    let selectedSkin = null;
+    const h2 = new VNode("h2", {
+      attrs: {},
+      children: ["Select Your Character:"]
+    });
 
-    const charBoxes = document.querySelectorAll(".char-box");
-    charBoxes.forEach((box) => {
-      box.addEventListener("click", () => {
-        charBoxes.forEach((b) => b.classList.remove("selected"));
-        box.classList.add("selected");
-        selectedSkin = box.getAttribute("data-skin");
+    const charBox1 = new VNode("div", {
+      attrs: { class: "char-box", "data-skin": "character1", id: "char1" }
+    });
+
+    const charBox2 = new VNode("div", {
+      attrs: { class: "char-box", "data-skin": "character2", id: "char2" }
+    });
+
+    const charBox3 = new VNode("div", {
+      attrs: { class: "char-box", "data-skin": "character3", id: "char3" }
+    });
+
+    const charBox4 = new VNode("div", {
+      attrs: { class: "char-box", "data-skin": "character4", id: "char4" }
+    });
+
+    const characterSelect = new VNode("div", {
+      attrs: { class: "character-select", id: "character-select" }
+    });
+    characterSelect.append(charBox1, charBox2, charBox3, charBox4);
+
+    const br3 = new VNode("br", { attrs: {} });
+    const br4 = new VNode("br", { attrs: {} });
+
+    const arrow = new VNode("span", {
+      attrs: { class: "arrow" },
+      children: [">"]
+    });
+
+    const joinBtn = new VNode("div", {
+      attrs: { id: "startBtn", class: "start-text" },
+      children: [arrow, " Join"]
+    });
+
+    container.append(headingText, nameInput, br1, br2, h2, characterSelect, br3, br4, joinBtn);
+
+    app = new App(container, app.$app, {
+      playerName: '',
+      selectedSkin: null
+    });
+
+    const charBoxes = ["char1", "char2", "char3", "char4"];
+    charBoxes.forEach((boxId) => {
+      const box = app.getVNodeById(boxId);
+      box.listenEvent("onclick", () => {
+        charBoxes.forEach((id) => {
+          const b = app.getVNodeById(id);
+          b.removeClass("selected");
+        });
+        box.addClass("selected");
+
+        app.state.selectedSkin = box.attrs["data-skin"];
+        app.update();
       });
     });
 
+    // Update state when input changes
+    const nameInputVNode = app.getVNodeById("playerName");
+    nameInputVNode.listenEvent("oninput", (e) => {
+      app.state.playerName = e.target.value;
+    });
+
     function submitName() {
-      const name = document.getElementById("playerName").value.trim();
+      const name = app.state.playerName.trim();
+      const selectedSkin = app.state.selectedSkin;
+
       if (!name) return alert("Name is required!");
       if (!selectedSkin) return alert("Please select a character!");
-      
-      let sessionId = localStorage.getItem("sessionId");
-      if (!sessionId) {
-        sessionId = crypto.randomUUID();
-        localStorage.setItem("sessionId", sessionId);
-      }
 
       localStorage.setItem("playerName", name);
       localStorage.setItem("playerSkin", selectedSkin);
 
-      socket.send(JSON.stringify({ 
-        type: "set_name",
-        name,
-        skin: selectedSkin,
-        sessionId : sessionId
-       }));
+      socket.send(JSON.stringify({ type: "set_name", name, skin: selectedSkin }));
       loadWaitingRoom();
     }
 
-    document.getElementById("startBtn").addEventListener("click", submitName);
-    document.getElementById("playerName").addEventListener("keydown", (e) => {
+    const startBtnVNode = app.getVNodeById("startBtn");
+    startBtnVNode.listenEvent("onclick", submitName);
+
+    nameInputVNode.listenEvent("onkeydown", (e) => {
       if (e.key === "Enter") submitName();
     });
   }
 
   function loadWaitingRoom() {
     import("./waiting.js").then((module) => {
-      module.showWaitingRoom();
+      module.showWaitingRoom(app.$app);
     });
   }
 

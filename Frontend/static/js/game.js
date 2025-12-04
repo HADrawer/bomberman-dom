@@ -1,8 +1,10 @@
 import { socket } from "../ws.js";
+import { VNode, App } from "../Framework/over-react.js";
 
 export let localPlayer = { id: null, x: 0, y: 0, speed: 1 };
 let grid = null;
 let powerups = {};
+let app = null;
 
 function renderBoard() {
   const gameArea = document.getElementById("gameArea");
@@ -23,92 +25,105 @@ function renderBoard() {
   }
 }
 
-export function startGame(serverGrid, players) {
+export function startGame(serverGrid, players, mountPoint) {
   grid = serverGrid;
 
-  const app = document.getElementById("app");
-  app.innerHTML = `
-  <div class="game-page">
+  const appContainer = mountPoint || document.getElementById("app");
 
-    <!-- LEFT = GAME -->
-    <div class="game-left">
-      <p style="text-align:center; margin-top:5px;">Use Arrow Keys • Press X to place bomb</p>
-      <div id="gameArea" class="grid" tabindex="0"></div>
-    </div>
+  // Create VNodes manually
+  const gamePage = new VNode("div", {
+    attrs: { class: "game-page", id: "game-page" }
+  });
 
-    <!-- RIGHT = CHAT -->
-    <div class="game-right">
-      <h3 class="game-chat-title">Chat</h3>
-      <div id="chat"></div>
-    </div>
+  // LEFT COLUMN
+  const gameLeft = new VNode("div", {
+    attrs: { class: "game-left", id: "game-left" }
+  });
 
-  </div>
-`;
+  const instructions = new VNode("p", {
+    attrs: { style: "text-align:center; margin-top:5px;" },
+    children: ["Use Arrow Keys • Press X to place bomb"]
+  });
 
+  const gameAreaVNode = new VNode("div", {
+    attrs: { id: "gameArea", class: "grid", tabindex: "0" }
+  });
 
-  const gameArea = document.getElementById("gameArea");
+  gameLeft.append(instructions, gameAreaVNode);
+
+  // RIGHT COLUMN
+  const gameRight = new VNode("div", {
+    attrs: { class: "game-right", id: "game-right" }
+  });
+
+  const chatTitle = new VNode("h3", {
+    attrs: { class: "game-chat-title" },
+    children: ["Chat"]
+  });
+
+  const chatBox = new VNode("div", {
+    attrs: { id: "chat" }
+  });
+
+  gameRight.append(chatTitle, chatBox);
+
+  gamePage.append(gameLeft, gameRight);
+
+  app = new App(gamePage, appContainer, {});
+
+  const gameArea = app.getVNodeById("gameArea");
 
   // 1. Draw grid
   grid.cells.forEach((row, r) => {
-    const rowEl = document.createElement("div");
-    rowEl.className = "row";
+    const rowEl = new VNode("div", {
+      attrs: { class: "row", id: `row-${r}` }
+    }, app);
 
     row.forEach((cell, c) => {
-      const cellEl = document.createElement("div");
-      cellEl.className = `cell ${cell.type}`;
-      cellEl.dataset.row = r;
-      cellEl.dataset.col = c;
-      rowEl.appendChild(cellEl);
-
+      const cellEl = new VNode("div", {
+        attrs: {
+          class: `cell ${cell.type}`,
+          'data-row': r.toString(),
+          'data-col': c.toString(),
+          id: `cell-${r}-${c}`
+        }
+      }, app);
+      rowEl.append(cellEl);
 
       // If a powerup exists in this cell, draw it
       if (cell.powerUp && cell.powerUp !== "") {
         const p = document.createElement("div");
         p.classList.add("powerup", `powerup-${cell.powerUp}`);
-        p.style.left = `${c * 42}px`;  // 40px cell + 2px gap
-        p.style.top = `${r * 42}px`;   // 40px cell + 2px gap
+        p.style.left = `${c * 42}px`;
+        p.style.top = `${r * 42}px`;
         p.style.position = "absolute";
         p.style.imageRendering = "pixelated";
 
-        gameArea.appendChild(p);
+        // Append to actual DOM gameArea after app.update()
+        setTimeout(() => {
+          const domGameArea = document.getElementById("gameArea");
+          if (domGameArea) domGameArea.appendChild(p);
+        }, 0);
       }
     });
 
-    gameArea.appendChild(rowEl);
+    gameArea.append(rowEl);
   });
 
-
   // 2. Draw all players
-  // 2. Draw all players
-  // players.forEach(p => {
-  //   const playerEl = document.createElement("div");
-
-  //   // 🧭 Default direction when spawning
-  //   playerEl.className = "player down";
-  //   playerEl.id = p.id;
-
-  //   placePlayerInCell(playerEl, p.y, p.x);
-
-  //   if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
-  //     localPlayer.id = p.id;
-  //     localPlayer.x = p.x;
-  //     localPlayer.y = p.y;
-  //   }
-  // });
   players.forEach(p => {
-    const playerEl = document.createElement("div");
-
-    // 🧭 Default direction
-    playerEl.classList.add("player", "down");
-
-    // 🧍 Use player skin from server if available
-    playerEl.dataset.skin = p.skin || localStorage.getItem("playerSkin") || "character1";
-
-    playerEl.id = p.id;
+    const playerEl = new VNode("div", {
+      attrs: {
+        class: "player down",
+        'data-skin': p.skin || localStorage.getItem("playerSkin") || "character1",
+        id: p.id
+      }
+    }, app);
 
     placePlayerInCell(playerEl, p.y, p.x);
     updateHearts(playerEl, p.lives ?? 3);
-    if (!localPlayer.id && p.session === localStorage.getItem("sessionId")) {
+
+    if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
       localPlayer.id = p.id;
       localPlayer.x = p.x;
       localPlayer.y = p.y;
@@ -116,9 +131,13 @@ export function startGame(serverGrid, players) {
     }
   });
 
+  app.update();
 
-  // if (myPlayer) {
-  gameArea.addEventListener("click", () => gameArea.focus());
+  // Focus handling
+  const domGameArea = document.getElementById("gameArea");
+  if (domGameArea) {
+    domGameArea.addEventListener("click", () => domGameArea.focus());
+  }
 
   // Movement interval settings
   const BASE_MOVE_INTERVAL_MS = 500;  // Normal speed: 500ms (half second)
@@ -163,9 +182,6 @@ export function startGame(serverGrid, players) {
     currentDirection = null;
   }
 
-  // Update movement interval when speed changes (called when picking up speed power-up)
- 
-
   document.addEventListener("keydown", (e) => {
     const key = e.key.toLowerCase();
     const dir = getDirectionFromKey(key);
@@ -207,53 +223,89 @@ export function startGame(serverGrid, players) {
     }
   });
 
-
-
-
-
   // Load chat
   import("../chat/app.js").then(chat => {
     chat.buildApp();
   });
 }
 
-
 function placePlayerInCell(playerEl, row, col) {
-  const cellEl = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
+  const cellEl = app.getVNodeById(`cell-${row}-${col}`);
   if (!cellEl) return;
-  // Remove from previous parent if any
-  if (playerEl.parentElement) playerEl.parentElement.removeChild(playerEl);
-  cellEl.appendChild(playerEl);
 
+  // Remove from previous parent if any
+  if (playerEl.parent) {
+    playerEl.parent.children = playerEl.parent.children.filter(c => c !== playerEl);
+  }
+
+  cellEl.append(playerEl);
 }
 
 function createHeartsEl(lives) {
-  const container = document.createElement('div');
-  container.className = 'hearts';
+  const container = new VNode('div', {
+    attrs: { class: 'hearts' }
+  }, app);
+
   for (let i = 0; i < 3; i++) {
-    const h = document.createElement('div');
-    h.className = 'heart';
-    h.textContent = '♥';
-    if (i >= lives) h.classList.add('empty');
-    container.appendChild(h);
+    const h = new VNode('div', {
+      attrs: { class: 'heart' },
+      children: ['♥']
+    }, app);
+
+    if (i >= lives) h.addClass('empty');
+    container.append(h);
   }
+
   return container;
 }
 
 function updateHearts(playerEl, lives) {
   if (!playerEl) return;
-  let hearts = playerEl.querySelector('.hearts');
+
+  let hearts = playerEl.children.find(c => c.attrs && c.attrs.class === 'hearts');
+
   if (!hearts) {
     hearts = createHeartsEl(lives);
-    playerEl.appendChild(hearts);
-    return
+    playerEl.append(hearts);
+    return;
   }
+
   const heartEls = hearts.children;
   for (let i = 0; i < 3; i++) {
     if (i < lives) {
-      heartEls[i].classList.remove('emtpy');
-      heartEls[i].textContent = "♥";
+      heartEls[i].removeClass('empty');
+      heartEls[i].children = ["♥"];
+    } else {
+      heartEls[i].addClass('empty');
+      heartEls[i].children = ['♡'];
+    }
+  }
+}
 
+// DOM version for runtime updates
+function updateHeartsDOM(playerEl, lives) {
+  if (!playerEl) return;
+
+  let hearts = playerEl.querySelector('.hearts');
+  if (!hearts) {
+    hearts = document.createElement('div');
+    hearts.className = 'hearts';
+    for (let i = 0; i < 3; i++) {
+      const h = document.createElement('div');
+      h.className = 'heart';
+      h.textContent = i < lives ? '♥' : '♡';
+      if (i >= lives) h.classList.add('empty');
+      hearts.appendChild(h);
+    }
+    playerEl.appendChild(hearts);
+    return;
+  }
+
+  const heartEls = hearts.children;
+  for (let i = 0; i < 3; i++) {
+    if (i < lives) {
+      heartEls[i].classList.remove('empty');
+      heartEls[i].textContent = '♥';
     } else {
       heartEls[i].classList.add('empty');
       heartEls[i].textContent = '♡';
@@ -261,33 +313,36 @@ function updateHearts(playerEl, lives) {
   }
 }
 
-socket.onmessage = (event) => {
+// Use addEventListener instead of onmessage to not override chat's listener
+socket.addEventListener("message", (event) => {
   const msg = JSON.parse(event.data);
+
+  // Ignore chat messages - let the chat handler deal with them
+  if (msg.type === "message") {
+    return;
+  }
 
   switch (msg.type) {
     case "player_joined": {
       const p = msg.player;
+      // Check if player element already exists in DOM
       if (!document.getElementById(p.id)) {
         const playerEl = document.createElement("div");
-        playerEl.className = "player down"; // default facing
+        playerEl.className = "player down";
+        playerEl.dataset.skin = msg.skin || "character1";
         playerEl.id = p.id;
 
-        // Assign the skin sent from server (or default)
-        playerEl.dataset.skin = msg.skin || "character1";
-
-        placePlayerInCell(playerEl, p.y, p.x);
+        const cellEl = document.querySelector(`.cell[data-row='${p.y}'][data-col='${p.x}']`);
+        if (cellEl) cellEl.appendChild(playerEl);
       }
       break;
     }
 
-
     case "player_moved": {
       const { id, x, y, direction } = msg;
       if (id === localPlayer.id) {
-        if (id === localPlayer.id) {
-          localPlayer.x = x;
-          localPlayer.y = y;
-  }
+        localPlayer.x = x;
+        localPlayer.y = y;
       }
 
       const playerEl = document.getElementById(id);
@@ -296,23 +351,30 @@ socket.onmessage = (event) => {
         playerEl.classList.remove("up", "down", "left", "right");
         if (direction) playerEl.classList.add(direction);
 
-        placePlayerInCell(playerEl, y, x);
+        // Move player to new cell
+        const cellEl = document.querySelector(`.cell[data-row='${y}'][data-col='${x}']`);
+        if (cellEl) {
+          if (playerEl.parentElement) playerEl.parentElement.removeChild(playerEl);
+          cellEl.appendChild(playerEl);
+        }
       }
       break;
     }
 
-
-
     case "player_left": {
       const playerEl = document.getElementById(msg.id);
-      if (playerEl) playerEl.remove();
+      if (playerEl) {
+        playerEl.remove();
+      }
       break;
     }
 
     case "player_damaged": {
       const { id, lives } = msg;
       const playerEl = document.getElementById(id);
-      if (playerEl) updateHearts(playerEl, lives);
+      if (playerEl) {
+        updateHeartsDOM(playerEl, lives);
+      }
       break;
     }
 
@@ -321,10 +383,11 @@ socket.onmessage = (event) => {
       const playerEl = document.getElementById(id);
       if (playerEl) {
         playerEl.style.opacity = '0.4';
-        updateHearts(playerEl, 0);
+        updateHeartsDOM(playerEl, 0);
       }
       break;
     }
+
     case "spawn_powerup": {
       const key = msg.x + "," + msg.y;
 
@@ -340,12 +403,9 @@ socket.onmessage = (event) => {
     }
 
     case "powerup_picked": {
-      // Remove the power-up from ALL clients when any player picks it up
       const key = msg.x + "," + msg.y;
       delete powerups[key];
       renderBoard();
-
-      // Update local player's speed if they picked up the power-up
       if (msg.playerID === localPlayer.id && msg.powerup === "speed") {
         if (localPlayer.speed < 2) {
           localPlayer.speed = 2;
@@ -367,10 +427,12 @@ socket.onmessage = (event) => {
       removeBomb(msg.id);
       break;
     }
+
     case "game_winner": {
       showGameOverlay(`${msg.name} wins the game! 🎉`);
       break;
     }
+
     case "game_draw": {
       showGameOverlay("It's a draw! 🤝");
       break;
@@ -379,7 +441,8 @@ socket.onmessage = (event) => {
     default:
       console.log("Unknown message:", msg);
   }
-}
+});
+
 function cleanupPowerups() {
   const now = Date.now();
   for (let k in powerups) {
@@ -389,72 +452,9 @@ function cleanupPowerups() {
   }
 }
 
-
-// function movePlayerLocally(direction) {
-//   const playerEl = document.getElementById(localPlayer.id);
-
-//   // Update sprite direction before moving
-//   playerEl.classList.remove("up", "down", "left", "right");
-//   playerEl.classList.add(direction);
-
-//   // Move based on speed (default 1, increases by 2 with speed power-up)
-//   const speed = localPlayer.speed || 1;
-
-//   for (let step = 0; step < speed; step++) {
-//     let newX = localPlayer.x;
-//     let newY = localPlayer.y;
-
-//     switch (direction) {
-//       case "up": newY--; break;
-//       case "down": newY++; break;
-//       case "left": newX--; break;
-//       case "right": newX++; break;
-//     }
-
-//     if (!grid || !grid.cells[newY] || typeof newX !== "number" || typeof newY !== "number") {
-//       console.warn("[Game] Invalid move coordinates:", newX, newY);
-//       break;
-//     }
-//     if (newX < 0 || newX >= grid.cols || newY < 0 || newY >= grid.rows) break;
-
-//     const cellEl = document.querySelector(`.cell[data-row="${newY}"][data-col="${newX}"]`);
-//     if (!cellEl) break;
-
-//     // Allow movement only through sand and start-zone cells
-//     if (!cellEl.classList.contains("sand") && !cellEl.classList.contains("start-zone")) {
-//       break;
-//     }
-
-//     // Update local position
-//     localPlayer.x = newX;
-//     localPlayer.y = newY;
-
-//     // Move the player visually
-//     placePlayerInCell(playerEl, newY, newX);
-
-//     // Pickup powerup if exists
-//     const key = newX + "," + newY;
-//     if (powerups[key]) {
-//       socket.send(JSON.stringify({
-//         type: "pickup_powerup",
-//         id: localPlayer.id,
-//         powerup: powerups[key].type,
-//         x: newX,
-//         y: newY
-//       }));
-//       delete powerups[key];
-//     }
-//   }
-// }
-
-
-//  Simulate explosion (remove bomb + show animation)
-
-
 function spawnBomb(id, x, y) {
   const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
   if (!cell) return;
-
 
   const old = cell.querySelector(".bomb");
   if (old) old.remove();
@@ -488,9 +488,7 @@ function handleExplosion(cells) {
   });
 }
 
-
 function showGameOverlay(text) {
-
   let overlay = document.getElementById("winnerOverlay");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -513,7 +511,7 @@ function showGameOverlay(text) {
   document.getElementById("winnerText").textContent = text;
   overlay.style.display = "flex";
 }
-//  Cleanup expired powerups every 200ms and redraw
+
 setInterval(() => {
   cleanupPowerups();
   renderBoard();

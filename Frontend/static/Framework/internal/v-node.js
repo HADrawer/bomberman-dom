@@ -6,6 +6,7 @@ export class VNode {
   attrs;
   children;
   eventRegister;
+  parent;
 
   constructor(tagName, { attrs = {}, children = [] } = {}, app = null) {
     if (typeof tagName !== "string") {
@@ -23,6 +24,7 @@ export class VNode {
     this.tagName = tagName;
     this.attrs = attrs;
     this.children = children;
+    this.parent = null;
 
     this.eventRegister = app ? app.eventRegister : null;
   }
@@ -32,6 +34,11 @@ export class VNode {
   }
 
   append(...children) {
+    children.forEach(child => {
+      if (typeof child !== "string" && child) {
+        child.parent = this;
+      }
+    });
     this.children.push(...children);
     return this;
   }
