@@ -235,4 +235,7 @@ type Bomb struct {
 	Y       int
 	Range   int
 	Timer   int
+	  Walkable  bool
+    PlacedAt  time.Time
 }
+

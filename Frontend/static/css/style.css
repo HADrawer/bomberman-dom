@@ -685,6 +685,10 @@ button:hover {
   border-radius: 10px;
   cursor: pointer;
   transition: 0.2s;
+
+  /* ⭐ Makes pixel sprites sharp instead of blurry */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .char-box:hover {
@@ -696,6 +700,7 @@ button:hover {
   border-color: #00ff9d;
   box-shadow: 0 0 10px #00ff9d;
 }
+
 
 /* Character images */
 .char-box[data-skin="character1"] {
@@ -775,4 +780,91 @@ button:hover {
 
 .powerup-speed {
   background-image: url("/static/css/sprites/speed-increase.png");
+}
+
+#lobbyStartBtn.start-text {
+    font-size: 22px;
+    color: #ffffff;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px 20px;
+
+    /* CRT-style RGB shadow */
+    text-shadow:
+        -2px 0px #ff2b2b,   /* red left */
+        2px 0px #00aaff;    /* blue right */
+
+    letter-spacing: 2px;
+    display: inline-block;
+}
+
+
+/* Hover movement glitchy effect */
+#lobbyStartBtn.start-text:hover {
+    transform: translateX(4px);
+    transition: 0.15s;
+}
+
+.start-text {
+    font-family: "Press Start 2P", monospace;
+    font-size: 22px;
+    color: #ffffff;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    display: inline-block;
+    letter-spacing: 2px;
+
+    /* CRT chromatic aberration shadow */
+    text-shadow:
+        -2px 0px #ff3b3b,   /* red */
+        2px 0px #00aaff;    /* blue */
+}
+
+/* Arrow stays same color */
+.start-text .arrow {
+    color: #ffffff;
+}
+
+/* Hover: small glitchy nudge */
+.start-text:hover {
+    transform: translateX(4px);
+    transition: 0.15s;
+}
+.error-box {
+    font-size: 14px;
+    color: #ff3b3b;
+    margin-bottom: 15px;
+  
+}
+.player-stats {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-around;
+  font-family: monospace;
+  font-size: 14px;
+  color: white;
+}
+
+.player-stat {
+  background: rgba(0,0,0,0.5);
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.stat-hearts {
+  margin-top: 2px;
+}
+
+.stat-heart {
+  margin: 0 1px;
+  color: red;
+  font-weight: bold;
+}
+
+.stat-heart.empty {
+  color: gray;
 }

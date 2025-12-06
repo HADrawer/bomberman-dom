@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"sync"
 	"time"
-
 	"github.com/gorilla/websocket"
 )
 
@@ -394,7 +393,7 @@ func generateGrid(rows, cols int) Grid {
 				cellType = "inner-wall"
 			} else {
 				// Random destructible stones (40%), not near start
-				if rand.Float64() < 0.4 && !isNearStartZone(r, c) {
+				if rand.Float64() < 0.8 && !isNearStartZone(r, c) {
 					cellType = "stone"
 				}
 			}
@@ -445,12 +444,40 @@ func assignPlayers() []Player {
 	}
 	return players
 }
+func canMove(player Player, newX, newY int) bool {
+    // 1. If bomb exists in target tile
+    for _, b := range bombs {
+        if b.X == newX && b.Y == newY {
+
+            // If owner is still standing ON the bomb → allow to stay
+            if b.OwnerID == player.ID && player.X == b.X && player.Y == b.Y {
+                return true
+            }
+
+            // If owner moved out the tile → lock it
+            if b.OwnerID == player.ID && !(player.X == b.X && player.Y == b.Y) {
+                // MAJOR FIX → bomb becomes solid
+                b.Walkable = false
+                bombs[b.ID] = b
+                return false
+            }
+
+            // Other players CANNOT walk on it
+            return false
+        }
+    }
+    return true
+}
+
 func movePlayer(id, dir string) {
 	mu.Lock()
 	for i, p := range gamePlayers {
 		if p.ID == id {
 
 			pp := &gamePlayers[i]
+   // Save old position BEFORE moving
+            oldX := pp.X
+            oldY := pp.Y
 
 			print("1")
 			
@@ -476,6 +503,10 @@ func movePlayer(id, dir string) {
 				case "right":
 					newX++
 				}
+				if !canMove(*pp, newX, newY) {
+    mu.Unlock()
+    return
+}
 
 				if newY < 0 || newY >= currentGrid.Rows ||
 					newX < 0 || newX >= currentGrid.Cols {
@@ -495,6 +526,24 @@ func movePlayer(id, dir string) {
 				pp.X = newX
 				pp.Y = newY
 
+ for bi := range bombs {
+b := bombs[bi]        // copy struct
+if b.OwnerID == pp.ID && b.Walkable {
+    if oldX != b.X || oldY != b.Y {
+        b.Walkable = false
+        bombs[bi] = b // write back updated struct
+    }
+}
+
+                // Bomb belongs to player and currently walkable
+                if b.OwnerID == pp.ID && b.Walkable {
+
+                    // Player moved off the bomb’s tile
+                    if oldX != b.X || oldY != b.Y {
+                        b.Walkable = false // ❄️ freeze it
+                    }
+                }
+            }
 				// Pick up power-up if present (still inside lock)
 				if cell.PowerUp != "" {
 					powerType := cell.PowerUp
@@ -630,15 +679,16 @@ func plant_bomb(playerID string, x int, y int) {
 
 	bombID := fmt.Sprintf("b_%d", time.Now().UnixNano())
 	bomb := Bomb{
-		ID:      bombID,
-		OwnerID: playerID,
-		X:       x,
-		Y:       y,
-		Range:   p.BombRange,
-		Timer:   2,
-	}
+    ID:       bombID,
+    X:        p.X,
+    Y:        p.Y,
+    OwnerID:  p.ID,
+    Range:    p.BombRange,
+    Walkable: true,
+    PlacedAt: time.Now(),
+}
 
-	bombs[bombID] = bomb
+    bombs[bomb.ID] = bomb
 	p.BombCount--
 
 	mu.Unlock()
@@ -681,8 +731,8 @@ func explodeBomb(b Bomb) {
 	}
 	var playersToDamage []Player
 
-	// 100% drop chance
-	const powerupDropChance = 100
+	// 35% drop chance
+	const powerupDropChance = 35
 
 	// collect spawned powerups while under lock, broadcast after unlock
 	var spawned []map[string]interface{}
@@ -707,25 +757,29 @@ func explodeBomb(b Bomb) {
 			explosionCells = append(explosionCells, []int{nx, ny})
 
 			if cell == "stone" {
-				// Destroy the stone
-				cellRef := &currentGrid.Cells[ny][nx]
-				cellRef.Type = "sand"
+	// Destroy the stone
+	cellRef := &currentGrid.Cells[ny][nx]
+	cellRef.Type = "sand"
 
-				// ALWAYS spawn a powerup
-				choices := []string{"bomb", "flame", "speed"}
-				ch := choices[rand.Intn(len(choices))]
-				cellRef.PowerUp = ch
+	// CHANCE to drop a powerup
+	if rand.Intn(100) < powerupDropChance {
+		choices := []string{"bomb", "flame", "speed"}
+		ch := choices[rand.Intn(len(choices))]
 
-				// queue spawn event to frontend
-				spawned = append(spawned, map[string]interface{}{
-					"type":    "spawn_powerup",
-					"x":       nx,
-					"y":       ny,
-					"powerup": ch,
-				})
+		cellRef.PowerUp = ch // put into grid
 
-				break
-			}
+		// queue spawn event to frontend
+		spawned = append(spawned, map[string]interface{}{
+			"type":    "spawn_powerup",
+			"x":       nx,
+			"y":       ny,
+			"powerup": ch,
+		})
+	}
+
+	break
+}
+
 
 		}
 	}
@@ -763,5 +817,7 @@ func explodeBomb(b Bomb) {
 			gamePlayers[i].BombCount++
 		}
 	}
+	    delete(bombs, b.ID)
+
 	mu.Unlock()
 }

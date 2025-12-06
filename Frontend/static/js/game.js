@@ -138,6 +138,36 @@ export function startGame(serverGrid, players, mountPoint) {
   if (domGameArea) {
     domGameArea.addEventListener("click", () => domGameArea.focus());
   }
+// === Prevent walking into bombs ===
+function canMoveClient(x, y) {
+  const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
+  if (!cell) return false;
+
+  const bomb = cell.querySelector(".bomb");
+  if (!bomb) return true;
+
+  // If it's your bomb AND you are standing on it → allow walking off it
+  if (bomb.dataset.owner === localPlayer.id &&
+      x === localPlayer.x &&
+      y === localPlayer.y) {
+    return true;
+  }
+
+  return false;
+}
+
+// Predict next tile BEFORE sending to server
+function predictNewPosition(dir) {
+  let x = localPlayer.x;
+  let y = localPlayer.y;
+
+  if (dir === "up") y--;
+  if (dir === "down") y++;
+  if (dir === "left") x--;
+  if (dir === "right") x++;
+
+  return { x, y };
+}
 
   // Movement interval settings
   const BASE_MOVE_INTERVAL_MS = 500;  // Normal speed: 500ms (half second)
@@ -166,11 +196,37 @@ export function startGame(serverGrid, players, mountPoint) {
     stopMoving(); // Clear any existing movement
     currentDirection = dir;
 
-    socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction: currentDirection }));
+// Predict next tile
+const nextPos = predictNewPosition(dir);
+
+// If tile blocked by bomb → DO NOT SEND
+if (!canMoveClient(nextPos.x, nextPos.y)) return;
+
+// Safe → send move to server
+socket.send(JSON.stringify({ 
+    type: "move",
+    id: localPlayer.id,
+    direction: currentDirection 
+}));
 
     // Then continue moving at the current speed interval while key is held
     moveInterval = setInterval(() => {
-      socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction: currentDirection }));
+      socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction: currentDirection }
+        
+      )
+    )
+     // Recalculate next tile every frame
+  const next = predictNewPosition(currentDirection);
+
+  // If next tile has a bomb → STOP further movement
+  if (!canMoveClient(next.x, next.y)) return;
+
+  // Safe → send move
+  socket.send(JSON.stringify({
+    type: "move",
+    id: localPlayer.id,
+    direction: currentDirection
+  }));
     }, getMoveInterval());
   }
 

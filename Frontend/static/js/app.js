@@ -90,12 +90,23 @@ document.addEventListener("DOMContentLoaded", () => {
       children: [">"]
     });
 
-    const joinBtn = new VNode("div", {
-      attrs: { id: "startBtn", class: "start-text" },
-      children: [arrow, " Join"]
-    });
+    const errorBox = new VNode("div", {
+  attrs: { id: "nameError", class: "error-box", style: "display:none;" },
+  children: []
+});
 
-    container.append(headingText, nameInput, br1, br2, h2, characterSelect, br3, br4, joinBtn);
+  const joinBtn = new VNode("div", {
+  attrs: { id: "startBtn", class: "start-text" },
+  children: [arrow, " Join"]
+});
+
+// Parent container that holds BOTH
+const joinContainer = new VNode("div", {
+  attrs: { class: "join-container" },
+  children: [errorBox, joinBtn]
+});
+
+    container.append(headingText, nameInput, br1, br2, h2, characterSelect, br3, br4, joinContainer);
 
     app = new App(container, app.$app, {
       playerName: '',
@@ -122,20 +133,39 @@ document.addEventListener("DOMContentLoaded", () => {
     nameInputVNode.listenEvent("oninput", (e) => {
       app.state.playerName = e.target.value;
     });
+function showError(msg) {
+    const el = document.getElementById("nameError");
+    if (!el) return;
 
-    function submitName() {
-      const name = app.state.playerName.trim();
-      const selectedSkin = app.state.selectedSkin;
+    el.textContent = msg;
+    el.style.display = "block";
+}
 
-      if (!name) return alert("Name is required!");
-      if (!selectedSkin) return alert("Please select a character!");
+   function submitName() {
+    const name = app.state.playerName.trim();
+    const selectedSkin = app.state.selectedSkin;
 
-      localStorage.setItem("playerName", name);
-      localStorage.setItem("playerSkin", selectedSkin);
-
-      socket.send(JSON.stringify({ type: "set_name", name, skin: selectedSkin }));
-      loadWaitingRoom();
+    if (!name) {
+        showError("Name is required!");
+        return;
     }
+
+    if (!selectedSkin) {
+        showError("Select a character!");
+        return;
+    }
+
+    // clear error on success
+    const el = document.getElementById("nameError");
+    if (el) el.style.display = "none";
+
+    localStorage.setItem("playerName", name);
+    localStorage.setItem("playerSkin", selectedSkin);
+
+    socket.send(JSON.stringify({ type: "set_name", name, skin: selectedSkin }));
+    loadWaitingRoom();
+}
+
 
     const startBtnVNode = app.getVNodeById("startBtn");
     startBtnVNode.listenEvent("onclick", submitName);
