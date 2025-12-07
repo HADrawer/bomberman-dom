@@ -68,7 +68,7 @@ func startTimer() {
 	timerRunning = true
 
 	go func() {
-		timeLeft = 10
+		timeLeft = 20
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {

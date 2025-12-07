@@ -134,6 +134,7 @@ body {
   overflow-y: auto;
 }
 
+
 /* ------------------------------------------------ */
 
 /* 📟 RETRO SCROLLBAR FOR CHAT */
@@ -313,6 +314,18 @@ button:hover {
   font-size: 13px;
   color: #fff;
 }
+.system-msg {
+  text-align: center;
+  color: #999;
+  opacity: 0.85;
+  font-style: italic;
+  margin: 6px 0;
+}
+
+.system-msg .text {
+  color: inherit;
+}
+
 
 /* 📟 RETRO SCROLLBAR */
 ::-webkit-scrollbar {
