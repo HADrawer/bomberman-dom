@@ -7,19 +7,17 @@ export async function showWaitingRoom(mountPoint) {
   const appContainer = mountPoint || document.getElementById("app");
   const playerName = localStorage.getItem("playerName");
   const playerSkin = localStorage.getItem("playerSkin") || "character1";
-
+  const playerSession = localStorage.getItem("sessionId");
   const playerListFromServer = await getPlayerList();
   const connectedPlayers = new Map();
 
   playerListFromServer.forEach(player => {
-    if (typeof player === 'string') {
-      connectedPlayers.set(player, { name: player, skin: "character1" });
-    } else {
-      connectedPlayers.set(player.name, { name: player.name, skin: player.skin || "character1" });
-    }
+    
+      connectedPlayers.set(player.session, { name: player.name, skin: player.skin || "character1" });
+    
   });
 
-  connectedPlayers.set(playerName, { name: playerName, skin: playerSkin });
+  connectedPlayers.set(playerSession, { session: playerSession, name: playerName, skin: playerSkin });
 
   const waitingPage = new VNode("div", {
     attrs: { class: "waiting-page", id: "waiting-page" }
@@ -63,7 +61,7 @@ export async function showWaitingRoom(mountPoint) {
 
   // Initial player list population
   connectedPlayers.forEach(player => {
-    const isCurrentUser = player.name === playerName;
+    const isCurrentUser = player.session === playerSession;
 
     const playerItem = new VNode("div", {
       attrs: {
@@ -121,7 +119,7 @@ export async function showWaitingRoom(mountPoint) {
     playerListVNode.children = [];
 
     connectedPlayers.forEach(player => {
-      const isCurrentUser = player.name === playerName;
+      const isCurrentUser = player.session === playerSession;
 
       const playerItem = new VNode("div", {
         attrs: {
@@ -156,8 +154,8 @@ export async function showWaitingRoom(mountPoint) {
       const msg = JSON.parse(event.data);
 
       if (msg.type === "user_joined") {
-        if (!connectedPlayers.has(msg.name)) {
-          connectedPlayers.set(msg.name, {
+        if (!connectedPlayers.has(msg.session)) {
+          connectedPlayers.set(msg.session, {
             name: msg.name,
             skin: msg.skin || "character1"
           });
@@ -167,20 +165,19 @@ export async function showWaitingRoom(mountPoint) {
       else if (msg.type === "player_list") {
         connectedPlayers.clear();
         msg.players.forEach(player => {
-          if (typeof player === 'string') {
-            connectedPlayers.set(player, { name: player, skin: "character1" });
-          } else {
-            connectedPlayers.set(player.name, {
+          
+            connectedPlayers.set(player.session, {
+              session: player.session,
               name: player.name,
               skin: player.skin || "character1"
             });
-          }
+          
         });
-        connectedPlayers.set(playerName, { name: playerName, skin: playerSkin });
+        connectedPlayers.set(playerSession, {session: playerSession,  name: playerName, skin: playerSkin });
         updatePlayersList();
       }
       else if (msg.type === "user_left") {
-        connectedPlayers.delete(msg.name);
+        connectedPlayers.delete(msg.session);
         updatePlayersList();
       }
       else if (msg.type === "timer") {

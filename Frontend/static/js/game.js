@@ -123,7 +123,7 @@ export function startGame(serverGrid, players, mountPoint) {
     placePlayerInCell(playerEl, p.y, p.x);
     updateHearts(playerEl, p.lives ?? 3);
 
-    if (!localPlayer.id && p.name === localStorage.getItem("playerName")) {
+    if (!localPlayer.id && p.session === localStorage.getItem("sessionId")) {
       localPlayer.id = p.id;
       localPlayer.x = p.x;
       localPlayer.y = p.y;

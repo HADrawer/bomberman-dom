@@ -27,6 +27,8 @@ var upgrader = websocket.Upgrader{
 type ClientData struct {
 	Name string
 	Skin string
+	SessionID string
+	GameState string
 }
 
 var (
@@ -93,8 +95,9 @@ func startTimer() {
 					mu.Lock()
 					for conn, clientData := range clients {
 						for _, p := range gamePlayers {
-							if p.Name == clientData.Name {
+							if p.SessionID == clientData.SessionID {
 								connToPlayerID[conn] = p.ID
+								clientData.GameState = "StateInGame"
 								break
 							}
 						}
@@ -124,6 +127,7 @@ func sendPlayerList(conn *websocket.Conn) {
 		players = append(players, map[string]string{
 			"name": clientData.Name,
 			"skin": clientData.Skin,
+			"session": clientData.SessionID,
 		})
 	}
 
@@ -229,24 +233,32 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			name, _ := msg["name"].(string)
 			skin, _ := msg["skin"].(string)
+			
 
 			if name == "" {
 				log.Printf("Invalid or empty name received")
 				continue
 			}
 
-			currentUserID = name
+			session := generateSessionID()
+
+			currentUserID = session
 
 			mu.Lock()
-			clients[conn] = ClientData{Name: name, Skin: skin}
+			clients[conn] = ClientData{Name: name, Skin: skin, SessionID: session, GameState: "waiting_room"}
 			mu.Unlock()
+
+			conn.WriteJSON(map[string]interface{}{
+        	"type":      "session_assigned",
+      	  	"sessionId": session,
+    		})
 
 			log.Printf("User set name: %s with skin: %s", name, skin)
 
 			// Send welcome message to the new user
 			welcomeMsg := map[string]interface{}{
 				"type": "system",
-				"text": fmt.Sprintf("Hello %s , Waiting another players", currentUserID),
+				"text": fmt.Sprintf("Hello %s , Waiting another players", clients[conn].Name),
 			}
 			welcomeBytes, _ := json.Marshal(welcomeMsg)
 			conn.WriteMessage(websocket.TextMessage, welcomeBytes)
@@ -256,22 +268,18 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			// Broadcast to ALL other clients that a new user joined
 			userJoinedMsg := map[string]interface{}{
 				"type": "user_joined",
-				"name": currentUserID,
+				"name": name,
 				"skin": skin,
 			}
 
 			userJoinedBytes, _ := json.Marshal(userJoinedMsg)
 
-			// systemMsg := map[string]interface{}{
-			// 	"type": "system",
-			// 	"text": fmt.Sprintf("👤 %s انضم إلى اللعبة", currentUserID),
-			// }
-			// systemBytes, _ := json.Marshal(systemMsg)
+			
 			updateTimerBaseOnPlayers()
 			mu.Lock()
 			for client, clientData := range clients { // Don't send the join notification to the user who just joined
-				if clientData.Name != currentUserID {
-					log.Printf("Notifying %s about new user %s", clientData.Name, currentUserID)
+				if clientData.SessionID  != currentUserID {
+					log.Printf("Notifying %s about new user %s", clientData.Name)
 					client.WriteMessage(websocket.TextMessage, userJoinedBytes)
 					// client.WriteMessage(websocket.TextMessage, systemBytes)
 				}
@@ -347,6 +355,57 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			playerID := connToPlayerID[conn]
 			plant_bomb(playerID, bombMsg.X, bombMsg.Y)
+		
+		case "reconnect":
+			var msg map[string]interface{}
+			if err := json.Unmarshal(message, &msg); err != nil {
+				log.Printf("Error parsing set_name message: %v", err)
+				continue
+			}
+			mu.Lock()
+			session := msg["session"].(string)
+
+			state := ""
+			for _, clientData := range clients {
+						
+					if session == clientData.SessionID {
+								
+							state = clientData.GameState  
+							break
+					}
+						
+					}
+
+			if state == "" {
+				mu.Unlock()
+				conn.WriteJSON(map[string]interface{}{
+					"type":  "reconnect_status",
+					"state": "not_found",
+				})
+				return
+			}
+
+			mu.Unlock()
+			switch state {
+				case "waiting_room":
+					conn.WriteJSON(map[string]interface{}{
+						"type":  "reconnect_status",
+						"state": "waiting_room",
+					})
+				case "in_game":
+					conn.WriteJSON(map[string]interface{}{
+						"type":    "reconnect_status",
+						"state":   "in_game",
+						"grid":    currentGrid,
+						"players": gamePlayers,
+					})
+
+				// case StateDead:
+				// 	conn.WriteJSON(map[string]interface{}{
+				// 		"type":  "reconnect_status",
+				// 		"state": "dead",
+				// 	})
+				}
 		}
 
 	}
@@ -433,6 +492,8 @@ func assignPlayers() []Player {
 			X:         spawn[1],
 			Y:         spawn[0],
 			Name:      clientData.Name,
+			SessionID:    clientData.SessionID,
+			State: 		  StateInGame,
 			Skin:      clientData.Skin,
 			Lives:     3,
 			BombRange: 1,
@@ -820,4 +881,13 @@ func explodeBomb(b Bomb) {
 	    delete(bombs, b.ID)
 
 	mu.Unlock()
+}
+
+func generateSessionID() string {
+    letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+    b := make([]rune, 16)
+    for i := range b {
+        b[i] = letters[rand.Intn(len(letters))]
+    }
+    return string(b)
 }

@@ -163,6 +163,19 @@ function showError(msg) {
     localStorage.setItem("playerSkin", selectedSkin);
 
     socket.send(JSON.stringify({ type: "set_name", name, skin: selectedSkin }));
+
+    socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.type === "session_assigned") {
+        
+        localStorage.setItem("sessionId", msg.sessionId);
+        return;
+    }
+    
+    
+};
+
     loadWaitingRoom();
 }
 

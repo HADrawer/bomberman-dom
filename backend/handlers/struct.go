@@ -219,6 +219,8 @@ type Player struct {
 	X     int    `json:"x"`
 	Y     int    `json:"y"`
 	Name  string `json:"name"`
+	SessionID string `json:"session"`
+	State PlayerState
 	Skin  string `json:"skin"`
 	Lives int    `json:"lives"`
 
@@ -239,3 +241,10 @@ type Bomb struct {
     PlacedAt  time.Time
 }
 
+type PlayerState string
+
+const (
+    StateWaiting PlayerState = "waiting_room"
+    StateInGame  PlayerState = "in_game"
+    StateDead    PlayerState = "dead"
+)
