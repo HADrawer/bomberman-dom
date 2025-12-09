@@ -506,29 +506,41 @@ func assignPlayers() []Player {
 	return players
 }
 func canMove(player Player, newX, newY int) bool {
-    // 1. If bomb exists in target tile
+
+    // 1. Bomb blocking check
     for _, b := range bombs {
         if b.X == newX && b.Y == newY {
 
-            // If owner is still standing ON the bomb → allow to stay
+            // Owner standing ON bomb is allowed
             if b.OwnerID == player.ID && player.X == b.X && player.Y == b.Y {
                 return true
             }
 
-            // If owner moved out the tile → lock it
+            // Once owner steps off → bomb becomes solid
             if b.OwnerID == player.ID && !(player.X == b.X && player.Y == b.Y) {
-                // MAJOR FIX → bomb becomes solid
                 b.Walkable = false
                 bombs[b.ID] = b
                 return false
             }
 
-            // Other players CANNOT walk on it
+            // Others NEVER walk on bombs
             return false
         }
     }
+
+    // 2. Prevent walking into another player
+    for _, other := range gamePlayers {
+        if other.ID != player.ID {
+            if other.X == newX && other.Y == newY {
+                return false
+            }
+        }
+    }
+
+    // Otherwise free to move
     return true
 }
+
 
 func movePlayer(id, dir string) {
 	mu.Lock()
@@ -780,108 +792,134 @@ func bombCountdown(bombID string) {
 }
 
 func explodeBomb(b Bomb) {
-	explosionCells := [][]int{
-		{b.X, b.Y},
-	}
+    explosionCells := [][]int{
+        {b.X, b.Y},
+    }
 
-	dirs := [][]int{
-		{1, 0},
-		{-1, 0},
-		{0, -1},
-		{0, 1},
-	}
-	var playersToDamage []Player
+    dirs := [][]int{
+        {1, 0},
+        {-1, 0},
+        {0, -1},
+        {0, 1},
+    }
+    var playersToDamage []Player
 
-	// 35% drop chance
-	const powerupDropChance = 35
+    // 35% drop chance
+    const powerupDropChance = 35
 
-	// collect spawned powerups while under lock, broadcast after unlock
-	var spawned []map[string]interface{}
+    // collect spawned powerups while under lock, broadcast after unlock
+    var spawned []map[string]interface{}
 
-	mu.Lock()
-	for _, d := range dirs {
-		dx, dy := d[0], d[1]
-		for i := 1; i <= b.Range; i++ {
-			nx := b.X + dx*i
-			ny := b.Y + dy*i
+    mu.Lock()
+    for _, d := range dirs {
+        dx, dy := d[0], d[1]
+        for i := 1; i <= b.Range; i++ {
+            nx := b.X + dx*i
+            ny := b.Y + dy*i
 
-			if ny < 0 || ny >= currentGrid.Rows || nx < 0 || nx >= currentGrid.Cols {
-				break
-			}
+            if ny < 0 || ny >= currentGrid.Rows || nx < 0 || nx >= currentGrid.Cols {
+                break
+            }
 
-			cell := currentGrid.Cells[ny][nx].Type
+            cell := currentGrid.Cells[ny][nx].Type
 
-			if cell == "inner-wall" || cell == "wall" {
-				break
-			}
+            if cell == "inner-wall" || cell == "wall" {
+                break
+            }
 
-			explosionCells = append(explosionCells, []int{nx, ny})
+            explosionCells = append(explosionCells, []int{nx, ny})
 
-			if cell == "stone" {
-	// Destroy the stone
-	cellRef := &currentGrid.Cells[ny][nx]
-	cellRef.Type = "sand"
+            if cell == "stone" {
+                // Destroy the stone
+                cellRef := &currentGrid.Cells[ny][nx]
+                cellRef.Type = "sand"
 
-	// CHANCE to drop a powerup
-	if rand.Intn(100) < powerupDropChance {
-		choices := []string{"bomb", "flame", "speed"}
-		ch := choices[rand.Intn(len(choices))]
+                // CHANCE to drop a powerup
+                if rand.Intn(100) < powerupDropChance {
+                    choices := []string{"bomb", "flame", "speed"}
+                    ch := choices[rand.Intn(len(choices))]
 
-		cellRef.PowerUp = ch // put into grid
+                    cellRef.PowerUp = ch // put into grid
 
-		// queue spawn event to frontend
-		spawned = append(spawned, map[string]interface{}{
-			"type":    "spawn_powerup",
-			"x":       nx,
-			"y":       ny,
-			"powerup": ch,
-		})
-	}
+                    // queue spawn event to frontend
+                    spawned = append(spawned, map[string]interface{}{
+                        "type":    "spawn_powerup",
+                        "x":       nx,
+                        "y":       ny,
+                        "powerup": ch,
+                    })
+                }
 
-	break
+                break
+            }
+        }
+    }
+
+    for i := range gamePlayers {
+        p := &gamePlayers[i]
+        for _, c := range explosionCells {
+            if p.X == c[0] && p.Y == c[1] {
+                playersToDamage = append(playersToDamage, *p)
+                break
+            }
+        }
+    }
+    mu.Unlock()
+
+    // Broadcast any spawned powerups (frontend will show them)
+    for _, ev := range spawned {
+        broadcast(ev)
+    }
+
+    // For each spawned powerup schedule backend expiration after 15 seconds
+    // (do this AFTER unlocking to avoid sleeping while holding mu)
+    for _, ev := range spawned {
+        // capture local variables for goroutine
+        x, _ := ev["x"].(int)
+        y, _ := ev["y"].(int)
+        power, _ := ev["powerup"].(string)
+
+        go func(px, py int, pwr string) {
+            time.Sleep(15 * time.Second)
+
+
+            // Only clear if still the same powerup (not picked up or replaced)
+            if px >= 0 && py >= 0 && py < currentGrid.Rows && px < currentGrid.Cols {
+                if currentGrid.Cells[py][px].PowerUp == pwr {
+                    currentGrid.Cells[py][px].PowerUp = ""
+
+                    // Notify frontend that the powerup expired
+                    broadcast(map[string]interface{}{
+                        "type": "powerup_expired",
+                        "x":    px,
+                        "y":    py,
+                    })
+                }
+            }
+        }(x, y, power)
+    }
+
+    for _, p := range playersToDamage {
+        damagePlayer(p.ID, 1)
+    }
+
+    broadcast(map[string]interface{}{
+        "type":     "bomb_exploded",
+        "id":       b.ID,
+        "cells":    explosionCells,
+        "owner_id": b.OwnerID,
+    })
+
+    mu.Lock()
+    for i := range gamePlayers {
+        if gamePlayers[i].ID == b.OwnerID {
+            gamePlayers[i].BombCount++
+        }
+    }
+    delete(bombs, b.ID)
+    mu.Unlock()
 }
 
-
-		}
-	}
-
-	for i := range gamePlayers {
-		p := &gamePlayers[i]
-		for _, c := range explosionCells {
-			if p.X == c[0] && p.Y == c[1] {
-				playersToDamage = append(playersToDamage, *p)
-				break
-			}
-		}
-	}
-	mu.Unlock()
-
-	// Broadcast any spawned powerups
-	for _, ev := range spawned {
-		broadcast(ev)
-	}
-
-	for _, p := range playersToDamage {
-		damagePlayer(p.ID, 1)
-	}
-
-	broadcast(map[string]interface{}{
-		"type":     "bomb_exploded",
-		"id":       b.ID,
-		"cells":    explosionCells,
-		"owner_id": b.OwnerID,
-	})
-
-	mu.Lock()
-	for i := range gamePlayers {
-		if gamePlayers[i].ID == b.OwnerID {
-			gamePlayers[i].BombCount++
-		}
-	}
-	    delete(bombs, b.ID)
-
-	mu.Unlock()
-}
 
 func generateSessionID() string {
     letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
