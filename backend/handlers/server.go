@@ -815,7 +815,7 @@ func explodeBomb(b Bomb) {
         dx, dy := d[0], d[1]
         for i := 1; i <= b.Range; i++ {
             nx := b.X + dx*i
-            ny := b.Y + dy*i
+            ny := b.Y + dy*i 
 
             if ny < 0 || ny >= currentGrid.Rows || nx < 0 || nx >= currentGrid.Cols {
                 break
