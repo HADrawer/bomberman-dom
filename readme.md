@@ -1,6 +1,5 @@
 <div align="center">
   <h1>🔥 Bomberman DOM – Multiplayer Browser Game</h1>
-  <img src="logo.png" width="180" alt="Project Logo">
   <br /><br />
 </div>
 
@@ -165,7 +164,7 @@ BOMBERMAN-DOM-2
 
 ## 👥 Group Members
 
-| Name | Git Username |
+| Name | Username |
 |------|--------------|
 | Hashem Ahmed | `hasahmed` |
 | Faisal Almarzouqi | `falmarzo` |
