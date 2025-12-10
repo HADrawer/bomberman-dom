@@ -112,22 +112,6 @@ After the 10-second countdown →
 - **Performance APIs**  
 - **requestAnimationFrame**  
 
----
-
-## 🎁 Bonus Features (Optional)
-These features can be added to earn extra credit:
-
-- 🤖 **AI enemies** (Solo / Co-Op)  
-- 🟥 **More power-ups**  
-- 🧱 Block Pass  
-- 💣 Bomb Pass  
-- 🎯 Detonator (manual explosion)  
-- ❤️ 1-Up (extra life)  
-- 💀 Drop power-ups when dying  
-- 👻 Ghost mode after death (touch a player to revive)  
-- 👥 2v2 Team Mode  
-
----
 
 ## 📁 Project Structure 
 
