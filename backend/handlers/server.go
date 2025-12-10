@@ -72,7 +72,17 @@ func startTimer() {
 	timerRunning = true
 
 	go func() {
-		timeLeft = 20
+		// set initial timeLeft based on current player count
+		playerCount := len(clients)
+
+		if playerCount == 2 {
+			timeLeft = 20
+		} else if playerCount == 3 || playerCount == 4 {
+			timeLeft = 10
+		} else {
+			// default fallback
+			timeLeft = 20
+		}
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -149,18 +159,38 @@ func updateTimerBaseOnPlayers() {
 	count := len(clients)
 	mu.Unlock()
 
+	// Start or stop timer depending on player count
 	if count >= 2 && count <= 4 {
 		if !timerRunning {
 			log.Println("Starting timer...")
 			startTimer()
+		} else {
+			// Timer is already running — if we now have 3 players and timeLeft is >10, shorten to 10
+			if count >= 3 {
+				// only modify if we're above 10 to avoid extending or interfering when near zero
+				if timeLeft > 10 {
+					log.Println("Third player joined — shortening timer to 10 seconds.")
+					timeLeft = 10
+					// Notify clients of new shortened timer immediately
+					broadcast(map[string]interface{}{
+						"type":      "timer",
+						"time_left": timeLeft,
+					})
+				}
+			}
 		}
 	} else {
 		if timerRunning {
 			log.Println("Not enough players, stopping timer.")
-			stopTimer <- true
+			// use non-blocking send so we don't deadlock if timer goroutine already exited
+			select {
+			case stopTimer <- true:
+			default:
+			}
 		}
 	}
 }
+
 
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -318,9 +348,9 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Message from %s: %s", currentUserName, myMessage.Text)
 
 			for client := range clients {
-				if currentUserID == clients[client].Name {
-					continue // Skip sender
-				}
+			if client == conn {
+    continue // skip sending to sender
+}
 				var sendMessage MyMessage
 				sendMessage.Type = "message"
 				sendMessage.From = currentUserName
@@ -529,6 +559,13 @@ func canMove(player Player, newX, newY int) bool {
 	for _, b := range bombs {
 		if b.X == newX && b.Y == newY {
 
+			// If the bomb's owner is no longer in the game, treat it as not blocking
+			if !ownerStillAlive(b.OwnerID) {
+				// Optionally, you could delete the bomb here if desired:
+				// delete(bombs, b.ID)
+				return true
+			}
+
 			// Owner standing ON bomb is allowed
 			if b.OwnerID == player.ID && player.X == b.X && player.Y == b.Y {
 				return true
@@ -547,17 +584,25 @@ func canMove(player Player, newX, newY int) bool {
 	}
 
 	// 2. Prevent walking into another player
-	for _, other := range gamePlayers {
-		if other.ID != player.ID {
-			if other.X == newX && other.Y == newY {
-				return false
-			}
-		}
-	}
+	// Prevent walking into another player
+for _, other := range gamePlayers {
+    if other.ID != player.ID {
+
+        // NEW FIX: Skip dead players entirely
+        if other.State == StateDead {
+            continue
+        }
+
+        if other.X == newX && other.Y == newY {
+            return false
+        }
+    }
+}
 
 	// Otherwise free to move
 	return true
 }
+
 
 func movePlayer(id, dir string) {
 	mu.Lock()
@@ -713,6 +758,21 @@ func damagePlayer(id string, amount int) {
 					"name": p.Name,
 				})
 			}
+			if gamePlayers[i].Lives <= 0 {
+    gamePlayers[i].State = StateDead
+
+    // Remove their body from the grid
+    gamePlayers[i].X = -1
+    gamePlayers[i].Y = -1
+
+    broadcast(map[string]interface{}{
+        "type": "player_died",
+        "id":   p.ID,
+    })
+
+    return
+}
+
 			break
 		}
 	}
@@ -941,4 +1001,13 @@ func generateSessionID() string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+// ownerStillAlive returns true if a player with given id exists in gamePlayers
+func ownerStillAlive(ownerID string) bool {
+	for _, p := range gamePlayers {
+		if p.ID == ownerID {
+			return true
+		}
+	}
+	return false
 }
