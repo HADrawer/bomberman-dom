@@ -6,23 +6,199 @@ let grid = null;
 let powerups = {};
 let app = null;
 
-function renderBoard() {
-  const gameArea = document.getElementById("gameArea");
-  if (!gameArea) return;
+let rafId = null
+let lastTick = 0
+const TICK_RATE_MS = 200 // logic tick rate (same as your old setInterval 200ms)
+let running = false
 
-  // Remove old powerups
-  document.querySelectorAll(".powerup").forEach(p => p.remove());
+let fpsCounter = 0
+let fpsLastTime = 0
+let currentFPS = 0
+let frameTimeSum = 0
+let frameCount = 0
+const MAX_FRAME_TIME_MS = 16.67 // 60fps target
+let slowFrameCount = 0
+
+let cachedGameArea = null
+const cachedPowerupElements = new Map() 
+
+let powerupsChanged = false
+const lastPowerupsState = {}
+
+let perfMonitor = null
+
+function renderBoard(deltaTime) {
+  const frameStartTime = performance.now();
+
+   if (!cachedGameArea) {
+    cachedGameArea = document.getElementById("gameArea")
+    if (!cachedGameArea) return
+  }
+
+   if (powerupsChanged) {
+    updatePowerupsDOM()
+    powerupsChanged = false
+  }
+
+  // // Remove old powerups
+  // document.querySelectorAll(".powerup").forEach(p => p.remove());
+
+   const frameTime = performance.now() - frameStartTime
+  frameTimeSum += frameTime
+  frameCount++
+
+  if (frameTime > MAX_FRAME_TIME_MS) {
+    slowFrameCount++
+    if (slowFrameCount % 60 === 0) {
+      console.warn(
+        `[Performance] Slow frame detected: ${frameTime.toFixed(2)}ms (target: ${MAX_FRAME_TIME_MS.toFixed(2)}ms)`,
+      )
+    }
+  }
 
   // Draw active powerups
-  for (let k in powerups) {
-    const p = powerups[k];
-    const el = document.createElement("div");
-    el.classList.add("powerup", `powerup-${p.type}`);
-    el.style.position = "absolute";
-    el.style.left = (p.x * 42) + "px";  // 40px cell + 2px gap
-    el.style.top = (p.y * 42) + "px";   // 40px cell + 2px gap
-    gameArea.appendChild(el);
+  // for (let k in powerups) {
+  //   const p = powerups[k];
+  //   const el = document.createElement("div");
+  //   el.classList.add("powerup", `powerup-${p.type}`);
+  //   el.style.position = "absolute";
+  //   el.style.left = (p.x * 42) + "px";  // 40px cell + 2px gap
+  //   el.style.top = (p.y * 42) + "px";   // 40px cell + 2px gap
+  //   gameArea.appendChild(el);
+  // }
+}
+function updatePowerupsDOM() {
+  if (!cachedGameArea) return
+   for (const [key, element] of cachedPowerupElements) {
+    if (!powerups[key]) {
+      element.remove()
+      cachedPowerupElements.delete(key)
+    }
   }
+
+   for (const key in powerups) {
+    const p = powerups[key]
+
+    if (!cachedPowerupElements.has(key)) {
+      const el = document.createElement("div")
+      el.classList.add("powerup", `powerup-${p.type}`)
+      el.style.position = "absolute"
+      el.style.left = p.x * 42 + "px"
+      el.style.top = p.y * 42 + "px"
+      el.dataset.pos = key
+      cachedGameArea.appendChild(el)
+      cachedPowerupElements.set(key, el)
+    }
+  }
+
+}
+function tick() {
+  cleanupPowerups()
+}
+
+function startGameLoop() {
+  if (running) return
+  running = true
+  lastTick = performance.now()
+  fpsLastTime = performance.now()
+  frameTimeSum = 0
+  frameCount = 0
+  slowFrameCount = 0
+
+  createPerformanceMonitor()
+
+  rafId = requestAnimationFrame(gameLoop)
+}
+
+function stopGameLoop() {
+  running = false
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+
+  if (perfMonitor) {
+    perfMonitor.remove()
+    perfMonitor = null
+  }
+}
+
+function gameLoop(timestamp) {
+  if (!running) {
+    rafId = null
+    return
+  }
+    const loopStartTime = performance.now()
+
+    const deltaTime = timestamp - (lastTick || timestamp)
+
+    renderBoard(deltaTime)
+
+    if (timestamp - lastTick >= TICK_RATE_MS) {
+    tick()
+    lastTick = timestamp
+  }
+  fpsCounter++
+  if (timestamp - fpsLastTime >= 1000) {
+    currentFPS = fpsCounter
+    fpsCounter = 0
+    fpsLastTime = timestamp
+
+    updatePerformanceMonitor()
+
+    if (currentFPS < 55) {
+      console.warn(`[Performance] FPS dropped to ${currentFPS} (target: 60fps)`)
+    }
+  }
+   const loopTime = performance.now() - loopStartTime
+  if (loopTime > MAX_FRAME_TIME_MS) {
+    console.warn(`[Performance] Game loop took ${loopTime.toFixed(2)}ms (budget: ${MAX_FRAME_TIME_MS.toFixed(2)}ms)`)
+  }
+
+  rafId = requestAnimationFrame(gameLoop)
+}
+
+function createPerformanceMonitor() {
+  if (perfMonitor) return
+
+  // const perfMonitor = new VNode("div", {
+  //   attrs: {  id: "game-perfMonitor" }
+  // });
+  perfMonitor = document.createElement("div")
+  perfMonitor.id = "perfMonitor"
+  perfMonitor.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #0f0;
+    padding: 8px 12px;
+    font-family: monospace;
+    font-size: 12px;
+    border-radius: 4px;
+    z-index: 9999;
+    pointer-events: none;
+    line-height: 1.5;
+  `
+  document.body.appendChild(perfMonitor)
+  updatePerformanceMonitor()
+}
+
+function updatePerformanceMonitor() {
+  if (!perfMonitor) return
+
+  const avgFrameTime = frameCount > 0 ? (frameTimeSum / frameCount).toFixed(2) : 0
+  const fpsColor = currentFPS >= 58 ? "#0f0" : currentFPS >= 50 ? "#ff0" : "#f00"
+
+  perfMonitor.innerHTML = `
+    <div style="color: ${fpsColor}; font-weight: bold;">FPS: ${currentFPS}</div>
+    <div>Frame: ${avgFrameTime}ms</div>
+    <div>Slow: ${slowFrameCount}</div>
+  `
+
+  frameTimeSum = 0
+  frameCount = 0
+  slowFrameCount = 0
 }
 
 export function startGame(serverGrid, players, mountPoint) {
@@ -92,18 +268,14 @@ export function startGame(serverGrid, players, mountPoint) {
 
       // If a powerup exists in this cell, draw it
       if (cell.powerUp && cell.powerUp !== "") {
-        const p = document.createElement("div");
-        p.classList.add("powerup", `powerup-${cell.powerUp}`);
-        p.style.left = `${c * 42}px`;
-        p.style.top = `${r * 42}px`;
-        p.style.position = "absolute";
-        p.style.imageRendering = "pixelated";
-
-        // Append to actual DOM gameArea after app.update()
-        setTimeout(() => {
-          const domGameArea = document.getElementById("gameArea");
-          if (domGameArea) domGameArea.appendChild(p);
-        }, 0);
+         const key = `${c},${r}`
+        powerups[key] = {
+          type: cell.powerUp,
+          x: c,
+          y: r,
+          timeout: Date.now() + 15000,
+        }
+        powerupsChanged = true
       }
     });
 
@@ -134,52 +306,59 @@ export function startGame(serverGrid, players, mountPoint) {
   app.update();
 
   // Focus handling
-  const domGameArea = document.getElementById("gameArea");
-  if (domGameArea) {
-    domGameArea.addEventListener("click", () => domGameArea.focus());
+   cachedGameArea = document.getElementById("gameArea")
+  if (cachedGameArea) {
+    cachedGameArea.addEventListener("click", () => cachedGameArea.focus());
   }
-// === Prevent walking into bombs ===
-function canMoveClient(x, y) {
-  const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
-  if (!cell) return false;
+  startGameLoop();
 
-  const bomb = cell.querySelector(".bomb");
-  if (!bomb) return true;
-
-  // If it's your bomb AND you are standing on it → allow walking off it
-  if (bomb.dataset.owner === localPlayer.id &&
-      x === localPlayer.x &&
-      y === localPlayer.y) {
-    return true;
-  }
-
-  return false;
+  setupInputHandlers();
 }
 
-// Predict next tile BEFORE sending to server
-function predictNewPosition(dir) {
-  let x = localPlayer.x;
-  let y = localPlayer.y;
-
-  if (dir === "up") y--;
-  if (dir === "down") y++;
-  if (dir === "left") x--;
-  if (dir === "right") x++;
-
-  return { x, y };
-}
-
+function setupInputHandlers() {
+  
+  // === Prevent walking into bombs ===
+  function canMoveClient(x, y) {
+    const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
+    if (!cell) return false;
+  
+    const bomb = cell.querySelector(".bomb");
+    if (!bomb) return true;
+  
+    // If it's your bomb AND you are standing on it → allow walking off it
+    if (bomb.dataset.owner === localPlayer.id &&
+        x === localPlayer.x &&
+        y === localPlayer.y) {
+      return true;
+    }
+  
+    return false;
+  }
+  
+  // Predict next tile BEFORE sending to server
+  function predictNewPosition(dir) {
+    let x = localPlayer.x;
+    let y = localPlayer.y;
+    
+    if (dir === "up") y--;
+    if (dir === "down") y++;
+    if (dir === "left") x--;
+    if (dir === "right") x++;
+    
+    return { x, y };
+  }
+  
   // Movement interval settings
   const BASE_MOVE_INTERVAL_MS = 500;  // Normal speed: 500ms (half second)
   const FAST_MOVE_INTERVAL_MS = 250;  // With speed power-up: 250ms (quarter second)
   let currentDirection = null;
   let moveInterval = null;
-
+  
   function getMoveInterval() {
     // Speed 1 = 500ms, Speed 2 = 250ms
     return localPlayer.speed >= 2 ? FAST_MOVE_INTERVAL_MS : BASE_MOVE_INTERVAL_MS;
   }
-
+  
   function getDirectionFromKey(key) {
     switch (key) {
       case "arrowup": return "up";
@@ -189,47 +368,41 @@ function predictNewPosition(dir) {
       default: return null;
     }
   }
-
+  
   function startMoving(dir) {
     if (currentDirection === dir) return; // Already moving in this direction
-
+    
     stopMoving(); // Clear any existing movement
     currentDirection = dir;
-
-// Predict next tile
-const nextPos = predictNewPosition(dir);
-
-// If tile blocked by bomb → DO NOT SEND
-if (!canMoveClient(nextPos.x, nextPos.y)) return;
-
-// Safe → send move to server
-socket.send(JSON.stringify({ 
-    type: "move",
-    id: localPlayer.id,
-    direction: currentDirection 
-}));
-
+    
+    // Predict next tile
+    const nextPos = predictNewPosition(dir);
+    
+    // If tile blocked by bomb → DO NOT SEND
+    if (!canMoveClient(nextPos.x, nextPos.y)) return;
+    
+    // Safe → send move to server
+    socket.send(JSON.stringify({ 
+      type: "move",
+      id: localPlayer.id,
+      direction: currentDirection 
+    }));
+    
     // Then continue moving at the current speed interval while key is held
     moveInterval = setInterval(() => {
-      socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction: currentDirection }
-        
-      )
-    )
-     // Recalculate next tile every frame
-  const next = predictNewPosition(currentDirection);
-
-  // If next tile has a bomb → STOP further movement
-  if (!canMoveClient(next.x, next.y)) return;
-
-  // Safe → send move
-  socket.send(JSON.stringify({
-    type: "move",
-    id: localPlayer.id,
-    direction: currentDirection
-  }));
+      const next = predictNewPosition(currentDirection)
+      if (!canMoveClient(next.x, next.y)) {
+        return
+      }
+      socket.send(JSON.stringify({ type: "move", id: localPlayer.id, direction: currentDirection }),)
+      
+      
+     
+      
+     
     }, getMoveInterval());
   }
-
+  
   function stopMoving() {
     if (moveInterval) {
       clearInterval(moveInterval);
@@ -237,30 +410,30 @@ socket.send(JSON.stringify({
     }
     currentDirection = null;
   }
-
+  
   document.addEventListener("keydown", (e) => {
     const key = e.key.toLowerCase();
     const dir = getDirectionFromKey(key);
-
+    
     if (dir) {
       e.preventDefault(); // Prevent scrolling with arrow keys
       startMoving(dir);
     }
   });
-
+  
   document.addEventListener("keyup", (e) => {
     const key = e.key.toLowerCase();
     const dir = getDirectionFromKey(key);
-
+    
     // Only stop if the released key matches the current direction
     if (dir && dir === currentDirection) {
       stopMoving();
     }
   });
-
+  
   // Bomb placement (X key)
   let bombKeyHeld = false;
-
+  
   document.addEventListener("keydown", (e) => {
     const key = e.key.toLowerCase();
     if (key === "x" && !bombKeyHeld) {
@@ -272,60 +445,61 @@ socket.send(JSON.stringify({
       }));
     }
   });
-
+  
   document.addEventListener("keyup", (e) => {
     if (e.key.toLowerCase() === "x") {
       bombKeyHeld = false;
     }
   });
-
+  
   // Load chat
   import("../chat/app.js").then(chat => {
     chat.buildApp();
   });
+
 }
 
-function placePlayerInCell(playerEl, row, col) {
-  const cellEl = app.getVNodeById(`cell-${row}-${col}`);
-  if (!cellEl) return;
-
-  // Remove from previous parent if any
-  if (playerEl.parent) {
-    playerEl.parent.children = playerEl.parent.children.filter(c => c !== playerEl);
+  function placePlayerInCell(playerEl, row, col) {
+    const cellEl = app.getVNodeById(`cell-${row}-${col}`);
+    if (!cellEl) return;
+    
+    // Remove from previous parent if any
+    if (playerEl.parent) {
+      playerEl.parent.children = playerEl.parent.children.filter(c => c !== playerEl);
+    }
+    
+    cellEl.append(playerEl);
   }
-
-  cellEl.append(playerEl);
-}
-
-function createHeartsEl(lives) {
-  const container = new VNode('div', {
+  
+  function createHeartsEl(lives) {
+    const container = new VNode('div', {
     attrs: { class: 'hearts' }
   }, app);
-
+  
   for (let i = 0; i < 3; i++) {
     const h = new VNode('div', {
       attrs: { class: 'heart' },
       children: ['♥']
     }, app);
-
+    
     if (i >= lives) h.addClass('empty');
     container.append(h);
   }
-
+  
   return container;
 }
 
 function updateHearts(playerEl, lives) {
   if (!playerEl) return;
-
+  
   let hearts = playerEl.children.find(c => c.attrs && c.attrs.class === 'hearts');
-
+  
   if (!hearts) {
     hearts = createHeartsEl(lives);
     playerEl.append(hearts);
     return;
   }
-
+  
   const heartEls = hearts.children;
   for (let i = 0; i < 3; i++) {
     if (i < lives) {
@@ -341,7 +515,7 @@ function updateHearts(playerEl, lives) {
 // DOM version for runtime updates
 function updateHeartsDOM(playerEl, lives) {
   if (!playerEl) return;
-
+  
   let hearts = playerEl.querySelector('.hearts');
   if (!hearts) {
     hearts = document.createElement('div');
@@ -356,7 +530,7 @@ function updateHeartsDOM(playerEl, lives) {
     playerEl.appendChild(hearts);
     return;
   }
-
+  
   const heartEls = hearts.children;
   for (let i = 0; i < 3; i++) {
     if (i < lives) {
@@ -372,12 +546,12 @@ function updateHeartsDOM(playerEl, lives) {
 // Use addEventListener instead of onmessage to not override chat's listener
 socket.addEventListener("message", (event) => {
   const msg = JSON.parse(event.data);
-
+  
   // Ignore chat messages - let the chat handler deal with them
   if (msg.type === "message") {
     return;
   }
-
+  
   switch (msg.type) {
     case "player_joined": {
       const p = msg.player;
@@ -387,26 +561,26 @@ socket.addEventListener("message", (event) => {
         playerEl.className = "player down";
         playerEl.dataset.skin = msg.skin || "character1";
         playerEl.id = p.id;
-
+        
         const cellEl = document.querySelector(`.cell[data-row='${p.y}'][data-col='${p.x}']`);
         if (cellEl) cellEl.appendChild(playerEl);
       }
       break;
     }
-
+    
     case "player_moved": {
       const { id, x, y, direction } = msg;
       if (id === localPlayer.id) {
         localPlayer.x = x;
         localPlayer.y = y;
       }
-
+      
       const playerEl = document.getElementById(id);
       if (playerEl) {
         // Update direction sprite class
         playerEl.classList.remove("up", "down", "left", "right");
         if (direction) playerEl.classList.add(direction);
-
+        
         // Move player to new cell
         const cellEl = document.querySelector(`.cell[data-row='${y}'][data-col='${x}']`);
         if (cellEl) {
@@ -416,7 +590,7 @@ socket.addEventListener("message", (event) => {
       }
       break;
     }
-
+    
     case "player_left": {
       const playerEl = document.getElementById(msg.id);
       if (playerEl) {
@@ -424,7 +598,7 @@ socket.addEventListener("message", (event) => {
       }
       break;
     }
-
+    
     case "player_damaged": {
       const { id, lives } = msg;
       const playerEl = document.getElementById(id);
@@ -433,142 +607,165 @@ socket.addEventListener("message", (event) => {
       }
       break;
     }
-
+    
     case "player_dead": {
       const { id } = msg;
       const playerEl = document.getElementById(id);
       if (playerEl) {
-        playerEl.style.opacity = '0.4';
         updateHeartsDOM(playerEl, 0);
+        playerEl.remove()
+        if (id === localPlayer.id) {
+          localPlayer.speed = 0
+          
+          localPlayer.isDead = true
+        }
       }
       break;
     }
-
+    
     case "spawn_powerup": {
       const key = msg.x + "," + msg.y;
-
+      
       powerups[key] = {
         type: msg.powerup,
         x: msg.x,
         y: msg.y,
         timeout: Date.now() + 15000
       };
-
-      renderBoard();
+      
+      powerupsChanged = true
       break;
     }
-
+    
     case "powerup_picked": {
       const key = msg.x + "," + msg.y;
       delete powerups[key];
-      renderBoard();
+      powerupsChanged = true
       if (msg.playerID === localPlayer.id && msg.powerup === "speed") {
         if (localPlayer.speed < 2) {
           localPlayer.speed = 2;
-          console.log(`Speed increased! New speed: ${localPlayer.speed}`);
-        } else {
-          console.log(`Speed power-up picked but already at max speed: ${localPlayer.speed}`);
         }
       }
       break;
     }
-
+    
     case "bomb_planted": {
       spawnBomb(msg.id, msg.x, msg.y);
       break;
     }
-
+    
     case "bomb_exploded": {
       handleExplosion(msg.cells);
       removeBomb(msg.id);
       break;
     }
-
+    
     case "game_winner": {
       showGameOverlay(`${msg.name} wins the game! 🎉`);
+      stopGameLoop()
       break;
     }
-
+    
     case "game_draw": {
       showGameOverlay("It's a draw! 🤝");
+      stopGameLoop()
       break;
     }
-
+    
     default:
       console.log("Unknown message:", msg);
-  }
-});
+    }
+  });
+  
+  function cleanupPowerups() {
+    const now = Date.now();
+    let changed = false
 
-function cleanupPowerups() {
-  const now = Date.now();
-  for (let k in powerups) {
-    if (powerups[k].timeout <= now) {
-      delete powerups[k];
+    for (const k in powerups) {
+      if (powerups[k].timeout <= now) {
+        changed = true
+      }
+    }
+    if (changed) {
+      powerupsChanged = true
     }
   }
-}
-
-function spawnBomb(id, x, y) {
-  const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
-  if (!cell) return;
-
-  const old = cell.querySelector(".bomb");
-  if (old) old.remove();
-
-  const bomb = document.createElement("div");
-  bomb.className = "bomb";
-  bomb.dataset.id = id;
-
-  cell.appendChild(bomb);
-}
-
-function removeBomb(bombID) {
-  const bombEl = document.querySelector(`.bomb[data-id="${bombID}"]`);
-  if (bombEl) bombEl.remove();
-}
-
-function handleExplosion(cells) {
-  cells.forEach(([x, y]) => {
+  
+  function spawnBomb(id, x, y) {
     const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
     if (!cell) return;
-
-    if (cell.classList.contains("stone")) {
-      cell.classList.remove("stone");
-      cell.classList.add("sand");
-    }
-
-    const flame = document.createElement("div");
-    flame.className = "flame";
-    cell.appendChild(flame);
-    setTimeout(() => flame.remove(), 300);
-  });
-}
-
-function showGameOverlay(text) {
-  let overlay = document.getElementById("winnerOverlay");
-  if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.id = "winnerOverlay";
-    overlay.className = "winner-overlay";
-
-    const winnerText = document.createElement("h1");
-    winnerText.id = "winnerText";
-    overlay.appendChild(winnerText);
-
-    const restartBtn = document.createElement("button");
-    restartBtn.id = "restartBtn";
-    restartBtn.textContent = "Restart Game";
-    restartBtn.onclick = () => window.location.href = "/";
-    overlay.appendChild(restartBtn);
-
-    document.body.appendChild(overlay);
+    
+    const old = cell.querySelector(".bomb");
+    if (old) old.remove();
+    
+    const bomb = document.createElement("div");
+    bomb.className = "bomb";
+    bomb.dataset.id = id;
+    
+    cell.appendChild(bomb);
   }
+  
+  function removeBomb(bombID) {
+    const bombEl = document.querySelector(`.bomb[data-id="${bombID}"]`);
+    if (bombEl) bombEl.remove();
+  }
+  
+  function handleExplosion(cells) {
+    cells.forEach(([x, y]) => {
+      const cell = document.querySelector(`.cell[data-row="${y}"][data-col="${x}"]`);
+      if (!cell) return;
+      
+      if (cell.classList.contains("stone")) {
+        cell.classList.remove("stone");
+        cell.classList.add("sand");
+      }
+      
+      const flame = document.createElement("div");
+      flame.className = "flame";
+      cell.appendChild(flame);
+      setTimeout(() => flame.remove(), 300);
+    });
+  }
+  
+  function showGameOverlay(text) {
+    let overlay = document.getElementById("winnerOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "winnerOverlay";
+      overlay.className = "winner-overlay";
+      
+      const winnerText = document.createElement("h1");
+      winnerText.id = "winnerText";
+      overlay.appendChild(winnerText);
+      
+      const restartBtn = document.createElement("button");
+      restartBtn.id = "restartBtn";
+      restartBtn.textContent = "Restart Game";
+      restartBtn.onclick = () => window.location.href = "/";
+      overlay.appendChild(restartBtn);
+      
+      document.body.appendChild(overlay);
+    }
+    
+    document.getElementById("winnerText").textContent = text;
+    overlay.style.display = "flex";
+  }
+  document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    // pause
+    if (running && rafId) {
+      cancelAnimationFrame(rafId)
+      rafId = null
+    }
+  } else {
+    // resume
+    if (running && !rafId) {
+      lastTick = performance.now()
+      fpsLastTime = performance.now()
+      rafId = requestAnimationFrame(gameLoop)
+    }
+  }
+})
 
-  document.getElementById("winnerText").textContent = text;
-  overlay.style.display = "flex";
-}
 
-setInterval(() => {
-  cleanupPowerups();
-  renderBoard();
-}, 200);
+

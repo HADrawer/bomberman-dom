@@ -167,11 +167,15 @@ function showError(msg) {
     socket.onmessage = (event) => {
     const msg = JSON.parse(event.data);
 
-    if (msg.type === "session_assigned") {
-        
-        localStorage.setItem("sessionId", msg.sessionId);
-        return;
+     switch(msg.type) {
+        case "session_assigned":
+            localStorage.setItem("sessionId", msg.sessionId);
+            return;
+        case "join_denied":
+            showError(msg.reason);
+            return;
     }
+
     
     
 };
