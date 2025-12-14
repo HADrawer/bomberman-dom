@@ -1,4 +1,9 @@
-export const socket = new WebSocket("ws://localhost:8080/ws")
+const protocol = location.protocol === "https:" ? "ws" : "ws";
+const socket = new WebSocket(`${protocol}://${location.host}/ws`);
+
+// export const socket = new WebSocket("ws://10.1.201.24:8080/ws")
+
+export { socket };
 
 socket.addEventListener("open", (event) => {
   console.log("WebSocket connection established")

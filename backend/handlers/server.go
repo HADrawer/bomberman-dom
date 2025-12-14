@@ -735,47 +735,51 @@ func movePlayer(id, dir string) {
 	}
 }
 
-func damagePlayer(id string, amount int) {
 
-	for i, p := range gamePlayers {
-		if p.ID == id {
-			gamePlayers[i].Lives -= amount
-			if gamePlayers[i].Lives < 0 {
-				gamePlayers[i].Lives = 0
-			}
-
-			broadcast(map[string]interface{}{
-				"type":  "player_damaged",
-				"id":    p.ID,
-				"lives": gamePlayers[i].Lives,
-				"name":  p.Name,
-			})
-
-			if gamePlayers[i].Lives == 0 {
+	func damagePlayer(id string, amount int) {
+		for i, p := range gamePlayers {
+			if p.ID == id {
+				gamePlayers[i].Lives -= amount
+				if gamePlayers[i].Lives < 0 {
+					gamePlayers[i].Lives = 0
+				}
+	
+				// Broadcast damage
 				broadcast(map[string]interface{}{
-					"type": "player_dead",
-					"id":   p.ID,
-					"name": p.Name,
+					"type":  "player_damaged",
+					"id":    p.ID,
+					"lives": gamePlayers[i].Lives,
+					"name":  p.Name,
 				})
+	
+				// If player died, remove ghost immediately
+				if gamePlayers[i].Lives <= 0 {
+					gamePlayers[i].State = StateDead
+	
+					// Remove their body from the grid
+					gamePlayers[i].X = -1
+					gamePlayers[i].Y = -1
+	
+					broadcast(map[string]interface{}{
+						"type": "player_died",
+						"id":   p.ID,
+					})
+	
+					// Also broadcast "player_dead" if you want
+					broadcast(map[string]interface{}{
+						"type": "player_dead",
+						"id":   p.ID,
+						"name": p.Name,
+					})
+	
+					// Stop processing this player
+					break
+				}
+	
+				break
 			}
-			if gamePlayers[i].Lives <= 0 {
-    gamePlayers[i].State = StateDead
-
-    // Remove their body from the grid
-    gamePlayers[i].X = -1
-    gamePlayers[i].Y = -1
-
-    broadcast(map[string]interface{}{
-        "type": "player_died",
-        "id":   p.ID,
-    })
-
-    return
-}
-
-			break
 		}
-	}
+
 
 	alivePlayers := []Player{}
 	for _, p := range gamePlayers {
@@ -785,7 +789,7 @@ func damagePlayer(id string, amount int) {
 	}
 
 	if len(alivePlayers) == 1 {
-		gameStarted = false
+		
 		winner := alivePlayers[0]
 		broadcast(map[string]interface{}{
 			"type": "game_winner",
@@ -793,7 +797,6 @@ func damagePlayer(id string, amount int) {
 			"name": winner.Name,
 		})
 	} else if len(alivePlayers) == 0 {
-		gameStarted = false
 		broadcast(map[string]interface{}{
 			"type": "game_draw",
 			"text": "No one survived!",
@@ -822,7 +825,7 @@ func plant_bomb(playerID string, x int, y int) {
 		mu.Unlock()
 		return
 	}
-	
+
 	 	if p.BombCount <= 0 || p.State == StateDead {
 	    mu.Unlock()
 	    return
