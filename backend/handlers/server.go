@@ -785,6 +785,7 @@ func damagePlayer(id string, amount int) {
 	}
 
 	if len(alivePlayers) == 1 {
+		gameStarted = false
 		winner := alivePlayers[0]
 		broadcast(map[string]interface{}{
 			"type": "game_winner",
@@ -792,6 +793,7 @@ func damagePlayer(id string, amount int) {
 			"name": winner.Name,
 		})
 	} else if len(alivePlayers) == 0 {
+		gameStarted = false
 		broadcast(map[string]interface{}{
 			"type": "game_draw",
 			"text": "No one survived!",

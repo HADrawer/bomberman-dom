@@ -248,3 +248,11 @@ const (
     StateInGame  PlayerState = "in_game"
     StateDead    PlayerState = "dead"
 )
+
+type TimerPhase string
+
+const (
+	PhaseIdle    TimerPhase = "idle"
+	PhaseWaiting TimerPhase = "waiting" 
+	PhaseReady   TimerPhase = "ready"   
+)
