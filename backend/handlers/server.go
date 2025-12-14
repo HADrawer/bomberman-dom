@@ -822,6 +822,12 @@ func plant_bomb(playerID string, x int, y int) {
 		mu.Unlock()
 		return
 	}
+	
+	 	if p.BombCount <= 0 || p.State == StateDead {
+	    mu.Unlock()
+	    return
+	}
+
 
 	// Update player position to the provided coordinates
 	p.X = x
