@@ -653,6 +653,14 @@ socket.addEventListener("message", (event) => {
       spawnBomb(msg.id, msg.x, msg.y);
       break;
     }
+    case "powerup_expired": {
+      const key = msg.x + "," + msg.y
+      if (powerups[key]) {
+        delete powerups[key]
+        powerupsChanged = true
+      }
+      break
+    }
     
     case "bomb_exploded": {
       handleExplosion(msg.cells);
